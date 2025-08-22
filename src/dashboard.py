@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from data_ingestion import get_stock_data, get_company_info, get_stock_news
 
+#Author - Nishant
+
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Financial Analyzer",

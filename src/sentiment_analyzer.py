@@ -36,5 +36,4 @@ def analyze_sentiment(text, classifier):
         result['label'] = sentiment_map.get(result['label'], 'Neutral')
         return result
     except Exception as e:
-        # In a production environment, you would log this error
         return {'label': 'neutral', 'score': 0.0}
