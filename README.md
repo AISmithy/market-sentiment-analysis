@@ -80,6 +80,36 @@ Notes about model download and caching:
 - The FinBERT model is downloaded the first time the `transformers` pipeline is created. This requires internet connectivity and may take a minute.
 - The code uses Streamlit cache decorators to avoid reloading data/models repeatedly.
 
+## Running the app (Django)
+
+This repository also includes a minimal Django app that wraps the same ingestion and analysis logic and provides two HTTP endpoints useful for web UIs:
+
+- `/analyze/?ticker=XXX` — runs the full analysis (news fetch + sentiment scoring + history) and returns JSON used to render the full UI.
+- `/price/?ticker=XXX` — lightweight endpoint that returns only the current price and change (useful for frequent polling).
+
+Quick start (Windows PowerShell):
+
+```powershell
+# create and activate a virtual environment (if not already created)
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# install dependencies
+python -m pip install -r requirements.txt
+
+# apply Django migrations (SQLite DB used by default)
+.\.venv\Scripts\python.exe manage.py migrate
+
+# start the development server (binds to 127.0.0.1:8000 by default)
+.\.venv\Scripts\python.exe manage.py runserver
+```
+
+Open `http://127.0.0.1:8000/` in your browser. The default UI accepts a `ticker` and will call `/analyze/` to render the full page; the client also polls `/price/` for lightweight updates.
+
+Notes:
+- The first request that triggers model loading may be slow while the FinBERT weights download. Consider pre-warming the model in a background task if you plan to serve many users.
+- The Django app is intended for local development and prototyping; production deployment needs additional work (WSGI/ASGI configuration, reverse proxy, caching, and security).
+
 ## Common tasks
 
 - Update dependencies:
