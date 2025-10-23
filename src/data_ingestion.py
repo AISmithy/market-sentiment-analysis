@@ -1,10 +1,20 @@
 import yfinance as yf
 from yahoo_fin import news as yf_news
-import streamlit as st
-from sentiment_analyzer import load_sentiment_model, analyze_sentiment
+
+# Try to import Streamlit caching wrappers when available. If not, provide no-op decorators.
+try:
+    import streamlit as st
+    cache_data = st.cache_data
+except Exception:
+    def cache_data(ttl=None):
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+from .sentiment_analyzer import load_sentiment_model, analyze_sentiment
 
 
-@st.cache_data(ttl=3600)
+@cache_data(ttl=3600)
 def get_stock_data(ticker, period="5y"):
     """ Fetches historical stock data. """
     try:
@@ -15,7 +25,7 @@ def get_stock_data(ticker, period="5y"):
         return None
 
 
-@st.cache_data(ttl=86400)
+@cache_data(ttl=86400)
 def get_company_info(ticker):
     """ Fetches company profile information. """
     try:
@@ -32,12 +42,17 @@ def get_company_info(ticker):
         return None
 
 
-@st.cache_data(ttl=1800)
+@cache_data(ttl=1800)
 def get_stock_news(ticker):
     """ Fetches and analyzes the latest news articles. """
     classifier = load_sentiment_model()
     if classifier is None:
-        st.error("Sentiment model failed to load. News analysis disabled.")
+        # If running without Streamlit, just return an empty list
+        try:
+            import streamlit as st
+            st.error("Sentiment model failed to load. News analysis disabled.")
+        except Exception:
+            pass
         return []
 
     try:

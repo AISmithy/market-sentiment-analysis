@@ -8,3 +8,4 @@ plotly
 transformers
 torch
 accelerate
+django

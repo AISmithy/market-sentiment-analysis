@@ -1,8 +1,17 @@
 from transformers import pipeline
-import streamlit as st
+
+# Try to import streamlit cache decorator; fall back to noop when not available.
+try:
+    import streamlit as st
+    cache_resource = st.cache_resource
+    _st_present = True
+except Exception:
+    _st_present = False
+    def cache_resource(fn):
+        return fn
 
 
-@st.cache_resource
+@cache_resource
 def load_sentiment_model():
     """
     Loads the FinBERT sentiment analysis model.
@@ -15,7 +24,10 @@ def load_sentiment_model():
         )
         return model
     except Exception as e:
-        st.error(f"Error loading sentiment model: {e}")
+        if _st_present:
+            st.error(f"Error loading sentiment model: {e}")
+        else:
+            print(f"Error loading sentiment model: {e}")
         return None
 
 

@@ -1,0 +1,219 @@
+{% extends 'sentiment/base.html' %}
+
+{% block content %}
+  <section style="max-width:1000px; margin: 0 auto;">
+    <form id="ticker-form" style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
+      <label for="ticker" style="font-weight:600;">Ticker:</label>
+      <input id="ticker" name="ticker" value="AAPL" style="padding:6px 8px; font-size:1rem;" />
+      <button type="submit" style="padding:6px 12px;">Analyze</button>
+      <button id="raw-toggle" type="button" style="margin-left:auto; padding:6px 10px;">Toggle Raw JSON</button>
+    </form>
+
+    <div id="loading" style="display:none;">Loading…</div>
+
+    <div id="content" style="display:none; gap:16px;">
+      <section id="company" style="background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px;">
+        <!-- company card -->
+      </section>
+
+      <section id="price-chart" style="margin-top:0; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <h3 style="margin-top:0;">Historical Price Data (Candlestick)</h3>
+        <div id="candlestick-chart" style="width:100%; height:420px;"></div>
+      </section>
+
+      <section style="display:flex; gap:16px; align-items:flex-start; margin-top:16px;">
+        <div id="news" style="flex:1; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <h3 style="margin-top:0;">Recent News</h3>
+          <div id="news-list"></div>
+        </div>
+
+        <div id="chart-area" style="width:320px; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <h3 style="margin-top:0;">Sentiment Summary</h3>
+          <div id="sentiment-chart"></div>
+        </div>
+      </section>
+
+      <section id="raw" style="margin-top:12px; display:none;">
+        <h4>Raw JSON</h4>
+        <pre id="raw-json" style="white-space: pre-wrap; background:#0b1220; color:#cfe9ff; padding:12px; border-radius:8px; overflow:auto; max-height:420px;"></pre>
+      </section>
+    </div>
+  </section>
+
+  <style>
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; color:white; font-weight:600; font-size:0.9rem; }
+    .badge.positive { background:#28a745; }
+    .badge.negative { background:#dc3545; }
+    .badge.neutral { background:#6c757d; }
+    .news-item { padding:10px 0; border-bottom:1px solid #eee; }
+    .news-item:last-child{ border-bottom:none; }
+  </style>
+
+  <script>
+    // Load Plotly from CDN
+    (function loadPlotly(){
+      if(window.Plotly) return;
+      const s = document.createElement('script');
+      s.src = 'https://cdn.plot.ly/plotly-latest.min.js';
+      s.defer = true;
+      document.head.appendChild(s);
+    })();
+
+    const form = document.getElementById('ticker-form');
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    const companyEl = document.getElementById('company');
+    const newsList = document.getElementById('news-list');
+    const rawSection = document.getElementById('raw');
+    const rawJson = document.getElementById('raw-json');
+    const rawToggle = document.getElementById('raw-toggle');
+
+    rawToggle.addEventListener('click', () => {
+      rawSection.style.display = rawSection.style.display === 'none' ? 'block' : 'none';
+    });
+
+    function clearContent(){
+      companyEl.innerHTML = '';
+      newsList.innerHTML = '';
+      rawJson.textContent = '';
+    }
+
+    function formatMarketCap(m){ return m ?? 'N/A'; }
+
+    function sentimentBadge(label){
+      const l = (label || '').toLowerCase();
+      const span = document.createElement('span');
+      span.className = 'badge ' + (l === 'positive' ? 'positive' : l === 'negative' ? 'negative' : 'neutral');
+      span.textContent = label || 'Neutral';
+      return span;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ticker = document.getElementById('ticker').value.trim();
+      if(!ticker) return;
+
+      clearContent();
+      loading.style.display = 'block';
+      content.style.display = 'none';
+
+      try{
+        const res = await fetch(`/analyze/?ticker=${encodeURIComponent(ticker)}`);
+        if(!res.ok) throw new Error('Server returned ' + res.status);
+        const data = await res.json();
+
+        // Company card
+        const c = data.company || {};
+        const title = document.createElement('div');
+        title.innerHTML = `<h2 style="margin:0 0 6px 0;">${data.ticker} — ${c.name ?? 'Unknown Company'}</h2>`;
+        const meta = document.createElement('div');
+        meta.style.color = '#555';
+        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)}`;
+        const summary = document.createElement('p');
+        summary.style.marginTop = '8px';
+        summary.textContent = c.business_summary ?? '';
+        companyEl.appendChild(title);
+        companyEl.appendChild(meta);
+        companyEl.appendChild(summary);
+
+        // News list
+        const news = data.news || [];
+        if(news.length === 0){
+          newsList.innerHTML = '<div>No recent news or sentiment analysis unavailable.</div>';
+        } else {
+          news.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'news-item';
+
+            const h = document.createElement('div');
+            const a = document.createElement('a');
+            a.href = item.link || '#';
+            a.textContent = item.title || 'No title';
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            h.appendChild(a);
+
+            const meta2 = document.createElement('div');
+            meta2.style.marginTop = '6px';
+            meta2.style.color = '#666';
+            const badge = sentimentBadge(item.sentiment_label);
+            meta2.appendChild(badge);
+            const score = document.createElement('span');
+            score.style.marginLeft = '8px';
+            score.textContent = item.sentiment_score != null ? `(${item.sentiment_score.toFixed(2)})` : '';
+            meta2.appendChild(score);
+            const pub = document.createElement('div');
+            pub.style.fontSize = '0.9rem';
+            pub.style.color = '#888';
+            pub.textContent = item.published || '';
+
+            div.appendChild(h);
+            div.appendChild(meta2);
+            div.appendChild(pub);
+            newsList.appendChild(div);
+          });
+        }
+
+        // Sentiment summary chart
+        try{
+          const counts = { Positive:0, Negative:0, Neutral:0 };
+          news.forEach(n => {
+            const label = n.sentiment_label || (n.label || 'Neutral');
+            if(label.toLowerCase().startsWith('posit')) counts.Positive++;
+            else if(label.toLowerCase().startsWith('neg')) counts.Negative++;
+            else counts.Neutral++;
+          });
+
+          const labels = [];
+          const values = [];
+          const colors = [];
+          if(counts.Positive>0){ labels.push('Positive'); values.push(counts.Positive); colors.push('#28a745'); }
+          if(counts.Negative>0){ labels.push('Negative'); values.push(counts.Negative); colors.push('#dc3545'); }
+          if(counts.Neutral>0){ labels.push('Neutral'); values.push(counts.Neutral); colors.push('#6c757d'); }
+
+          const chartDiv = document.getElementById('sentiment-chart');
+          if(window.Plotly && labels.length>0){
+            Plotly.newPlot(chartDiv, [{ values, labels, type:'pie', marker:{colors}, hole:0.4 }], {height:300, margin:{t:20,b:20,l:20,r:20}});
+          } else {
+            chartDiv.textContent = labels.length ? `${labels.map((l,i)=>`${l}: ${values[i]}`).join('\n')}` : 'No sentiment data';
+          }
+        }catch(e){
+          console.error('Chart error', e);
+        }
+
+        // Raw JSON
+        rawJson.textContent = JSON.stringify(data, null, 2);
+
+        // Candlestick chart
+        try{
+          const hist = data.history || [];
+          const chartDiv = document.getElementById('candlestick-chart');
+          if(hist.length > 0 && window.Plotly){
+            const x = hist.map(h => h.date);
+            const open = hist.map(h => h.open);
+            const high = hist.map(h => h.high);
+            const low = hist.map(h => h.low);
+            const close = hist.map(h => h.close);
+
+            const trace = { x, open, high, low, close, type: 'candlestick', increasing: {line: {color: '#28a745'}}, decreasing: {line: {color: '#dc3545'}} };
+            const layout = { margin:{t:20,b:30,l:40,r:20}, xaxis:{rangeslider:{visible:false}}, height:420 };
+            Plotly.newPlot(chartDiv, [trace], layout, {responsive:true});
+          } else {
+            document.getElementById('candlestick-chart').textContent = hist.length ? 'Plotly unavailable' : 'No historical data';
+          }
+        }catch(e){
+          console.error('Candlestick chart error', e);
+        }
+
+        content.style.display = 'flex';
+        content.style.flexDirection = 'column';
+        loading.style.display = 'none';
+      }catch(err){
+        loading.textContent = 'Error: ' + (err.message || err);
+      }
+    });
+
+    // Auto-run on page load with default ticker
+    window.addEventListener('load', () => form.dispatchEvent(new Event('submit')));
+  </script>
+{% endblock %}
