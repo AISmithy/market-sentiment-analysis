@@ -67,6 +67,8 @@
     const rawSection = document.getElementById('raw');
     const rawJson = document.getElementById('raw-json');
     const rawToggle = document.getElementById('raw-toggle');
+  let lastUpdatedEl = null;
+  let inFlight = false;
 
     rawToggle.addEventListener('click', () => {
       rawSection.style.display = rawSection.style.display === 'none' ? 'block' : 'none';
@@ -104,15 +106,35 @@
 
         // Company card
         const c = data.company || {};
-        const title = document.createElement('div');
-        title.innerHTML = `<h2 style="margin:0 0 6px 0;">${data.ticker} — ${c.name ?? 'Unknown Company'}</h2>`;
+  const title = document.createElement('div');
+  title.innerHTML = `<h2 style="margin:0 0 6px 0;">${data.ticker} — ${c.name ?? 'Unknown Company'}</h2>`;
+  // last-updated element
+  lastUpdatedEl = document.createElement('div');
+  lastUpdatedEl.style.fontSize = '0.85rem';
+  lastUpdatedEl.style.color = '#666';
+  lastUpdatedEl.style.marginTop = '6px';
+  lastUpdatedEl.textContent = '';
         const meta = document.createElement('div');
         meta.style.color = '#555';
-        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)}`;
+        // Price and delta
+        let currentText = 'N/A';
+        if(c.current_price != null){
+          currentText = '$' + c.current_price.toFixed(2);
+          const change = c.change;
+          const pct = c.change_pct;
+          if(change != null){
+            const up = change > 0;
+            const arrow = up ? '▲' : (change < 0 ? '▼' : '');
+            const color = up ? 'green' : (change < 0 ? 'red' : '#666');
+            currentText += ` <span style="color:${color}; font-weight:700;"> ${arrow} ${Math.abs(change).toFixed(2)} ${pct!=null? '('+pct.toFixed(2)+'% )':''}</span>`;
+          }
+        }
+        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)} &nbsp; • &nbsp; <strong>Current:</strong> ${currentText}`;
         const summary = document.createElement('p');
         summary.style.marginTop = '8px';
         summary.textContent = c.business_summary ?? '';
         companyEl.appendChild(title);
+  companyEl.appendChild(lastUpdatedEl);
         companyEl.appendChild(meta);
         companyEl.appendChild(summary);
 
@@ -208,6 +230,10 @@
         content.style.display = 'flex';
         content.style.flexDirection = 'column';
         loading.style.display = 'none';
+        // update last-updated timestamp
+        if(lastUpdatedEl){
+          lastUpdatedEl.textContent = 'Last updated: ' + new Date().toLocaleString();
+        }
       }catch(err){
         loading.textContent = 'Error: ' + (err.message || err);
       }
@@ -215,5 +241,12 @@
 
     // Auto-run on page load with default ticker
     window.addEventListener('load', () => form.dispatchEvent(new Event('submit')));
+
+    // Auto-refresh every 30s (only when page has loaded content)
+    setInterval(() => {
+      if(document.getElementById('content').style.display !== 'none' && !inFlight){
+        form.dispatchEvent(new Event('submit'));
+      }
+    }, 30000);
   </script>
 {% endblock %}

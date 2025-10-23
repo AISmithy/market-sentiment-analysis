@@ -42,6 +42,75 @@ def get_company_info(ticker):
         return None
 
 
+@cache_data(ttl=60)
+def get_current_price(ticker):
+    """Return the current market price (float) for the ticker or None."""
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info or {}
+        # Try common fields
+        price = info.get('regularMarketPrice') or info.get('currentPrice')
+        if price is None:
+            # try fast_info if available
+            fast = getattr(stock, 'fast_info', None)
+            if fast:
+                price = fast.get('lastPrice') if isinstance(fast, dict) else getattr(fast, 'lastPrice', None)
+        if price is not None:
+            return float(price)
+        # Fallback: recent close
+        hist = stock.history(period='2d')
+        if hist is not None and not hist.empty:
+            return float(hist['Close'].iloc[-1])
+    except Exception:
+        pass
+    return None
+
+
+@cache_data(ttl=60)
+def get_price_and_change(ticker):
+    """Return a dict with current_price, previous_close, change, and change_pct."""
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info or {}
+        current = info.get('regularMarketPrice') or info.get('currentPrice')
+        prev = info.get('regularMarketPreviousClose') or info.get('previousClose')
+
+        # Fallback to history when fields are missing
+        if (current is None or prev is None):
+            hist = stock.history(period='3d')
+            if hist is not None and len(hist) >= 2:
+                # last row = most recent close
+                prev = float(hist['Close'].iloc[-2]) if prev is None else prev
+                current = float(hist['Close'].iloc[-1]) if current is None else current
+            elif hist is not None and len(hist) == 1:
+                prev = float(hist['Close'].iloc[0]) if prev is None else prev
+                current = float(hist['Close'].iloc[0]) if current is None else current
+
+        if current is None:
+            return {'current_price': None, 'previous_close': None, 'change': None, 'change_pct': None}
+
+        current = float(current)
+        prev = float(prev) if prev is not None else None
+        if prev is None:
+            change = None
+            pct = None
+        else:
+            change = current - prev
+            try:
+                pct = (change / prev) * 100 if prev != 0 else None
+            except Exception:
+                pct = None
+
+        return {
+            'current_price': current,
+            'previous_close': prev,
+            'change': float(change) if change is not None else None,
+            'change_pct': float(pct) if pct is not None else None,
+        }
+    except Exception:
+        return {'current_price': None, 'previous_close': None, 'change': None, 'change_pct': None}
+
+
 @cache_data(ttl=1800)
 def get_stock_news(ticker):
     """ Fetches and analyzes the latest news articles. """

@@ -44,7 +44,19 @@ def get_company_data(ticker):
                     'volume': int(row.get('Volume', 0) or 0),
                 })
 
-        return {'profile': profile, 'history_head': hist.head(5).to_dict() if hist is not None else None, 'history': history_serialized}
+        # price + change (best-effort)
+        price_info = None
+        try:
+            price_info = data_ingestion.get_price_and_change(ticker)
+        except Exception:
+            price_info = None
+
+        return {
+            'profile': profile,
+            'history_head': hist.head(5).to_dict() if hist is not None else None,
+            'history': history_serialized,
+            'price': price_info,
+        }
     except Exception as e:
         logger.exception('Error getting company data')
         return {'error': str(e)}

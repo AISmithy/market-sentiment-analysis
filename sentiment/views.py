@@ -24,6 +24,18 @@ def analyze(request):
         company['sector'] = profile.get('Sector')
         company['market_cap'] = profile.get('Market Cap')
         company['business_summary'] = profile.get('Business Summary')
+    # price and change info if available
+    if isinstance(company_data, dict):
+        price_info = company_data.get('price') or {}
+        company['current_price'] = float(price_info.get('current_price')) if price_info.get('current_price') is not None else None
+        company['previous_close'] = float(price_info.get('previous_close')) if price_info.get('previous_close') is not None else None
+        company['change'] = float(price_info.get('change')) if price_info.get('change') is not None else None
+        company['change_pct'] = float(price_info.get('change_pct')) if price_info.get('change_pct') is not None else None
+    else:
+        company['current_price'] = None
+        company['previous_close'] = None
+        company['change'] = None
+        company['change_pct'] = None
 
     news = analyze_news_for_ticker(ticker)
 
