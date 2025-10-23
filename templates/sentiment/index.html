@@ -116,20 +116,26 @@
   lastUpdatedEl.textContent = '';
         const meta = document.createElement('div');
         meta.style.color = '#555';
-        // Price and delta
-        let currentText = 'N/A';
+        // Price and delta — create dedicated elements so polling updates don't duplicate content
+        let currentPriceHtml = 'N/A';
+        let deltaHtml = '';
         if(c.current_price != null){
-          currentText = '$' + c.current_price.toFixed(2);
-          const change = c.change;
-          const pct = c.change_pct;
-          if(change != null){
-            const up = change > 0;
-            const arrow = up ? '▲' : (change < 0 ? '▼' : '');
-            const color = up ? 'green' : (change < 0 ? 'red' : '#666');
-            currentText += ` <span style="color:${color}; font-weight:700;"> ${arrow} ${Math.abs(change).toFixed(2)} ${pct!=null? '('+pct.toFixed(2)+'% )':''}</span>`;
+          currentPriceHtml = `<span id="current-price">$${c.current_price.toFixed(2)}</span>`;
+          if(c.change != null){
+            const up = c.change > 0;
+            const arrow = up ? '▲' : (c.change < 0 ? '▼' : '');
+            const color = up ? 'green' : (c.change < 0 ? 'red' : '#666');
+            deltaHtml = `<span id="current-delta" style="color:${color}; font-weight:700;"> ${arrow} ${Math.abs(c.change).toFixed(2)} ${c.change_pct!=null? '('+c.change_pct.toFixed(2)+'% )':''}</span>`;
+          } else {
+            deltaHtml = `<span id="current-delta"></span>`;
           }
+        } else {
+          // ensure elements exist even when price is N/A so polling has targets
+          currentPriceHtml = `<span id="current-price">N/A</span>`;
+          deltaHtml = `<span id="current-delta"></span>`;
         }
-        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)} &nbsp; • &nbsp; <strong>Current:</strong> ${currentText}`;
+
+        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)} &nbsp; • &nbsp; <strong>Current:</strong> ${currentPriceHtml} ${deltaHtml}`;
         const summary = document.createElement('p');
         summary.style.marginTop = '8px';
         summary.textContent = c.business_summary ?? '';
@@ -242,11 +248,42 @@
     // Auto-run on page load with default ticker
     window.addEventListener('load', () => form.dispatchEvent(new Event('submit')));
 
-    // Auto-refresh every 30s (only when page has loaded content)
-    setInterval(() => {
-      if(document.getElementById('content').style.display !== 'none' && !inFlight){
-        form.dispatchEvent(new Event('submit'));
-      }
-    }, 30000);
+    // Lightweight price polling every 30s (only when page has loaded content)
+    async function pollPrice(){
+      if(document.getElementById('content').style.display === 'none' || inFlight) return;
+      const ticker = document.getElementById('ticker').value.trim();
+      if(!ticker) return;
+
+      inFlight = true;
+      try{
+        const res = await fetch(`/price/?ticker=${encodeURIComponent(ticker)}`);
+        if(!res.ok) throw new Error('Server returned ' + res.status);
+        const p = await res.json();
+        // update price and delta elements directly to avoid duplication
+        const priceEl = document.getElementById('current-price');
+        const deltaEl = document.getElementById('current-delta');
+        if(priceEl && p.current_price != null){
+          priceEl.textContent = '$' + p.current_price.toFixed(2);
+        }
+        if(deltaEl){
+          if(p.change != null){
+            const up = p.change > 0;
+            const arrow = up ? '▲' : (p.change < 0 ? '▼' : '');
+            const color = up ? 'green' : (p.change < 0 ? 'red' : '#666');
+            deltaEl.style.color = color;
+            deltaEl.style.fontWeight = '700';
+            deltaEl.textContent = ` ${arrow} ${Math.abs(p.change).toFixed(2)} ${p.change_pct!=null? '('+p.change_pct.toFixed(2)+'% )':''}`;
+          } else {
+            deltaEl.textContent = '';
+          }
+        }
+        if(lastUpdatedEl){ lastUpdatedEl.textContent = 'Last updated: ' + new Date().toLocaleString(); }
+      }catch(e){
+        console.warn('Price poll failed', e);
+      }finally{ inFlight = false; }
+    }
+
+    // start polling interval
+    setInterval(pollPrice, 30000);
   </script>
 {% endblock %}

@@ -54,3 +54,23 @@ def analyze(request):
     }
 
     return JsonResponse(data, safe=False)
+
+
+def price(request):
+    """Lightweight endpoint that returns only the price/change info for a ticker."""
+    ticker = request.GET.get('ticker', 'AAPL').upper()
+    company_data = get_company_data(ticker)
+    price_info = None
+    if isinstance(company_data, dict):
+        price_info = company_data.get('price') or {}
+    else:
+        price_info = {}
+
+    data = {
+        'ticker': ticker,
+        'current_price': price_info.get('current_price'),
+        'previous_close': price_info.get('previous_close'),
+        'change': price_info.get('change'),
+        'change_pct': price_info.get('change_pct'),
+    }
+    return JsonResponse(data)

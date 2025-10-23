@@ -2,6 +2,18 @@
 
 A compact Python project for fetching financial data and running AI-powered sentiment analysis on recent news for a given stock ticker. The app combines Yahoo Finance data, a FinBERT-based sentiment model from Hugging Face, and a Streamlit dashboard to visualize price history and recent news sentiment.
 
+## Main objective
+
+The primary goal of this project is to provide a lightweight, reproducible pipeline that combines financial data (prices, company profile, news) with an AI-based sentiment analysis model (FinBERT) and expose the results through a simple web UI. Key objectives include:
+
+- Fetch historical price data and current price for a given stock ticker.
+- Collect recent news items about the company and score each item for sentiment (Positive/Negative/Neutral) using a FinBERT model from Hugging Face.
+- Present the results in an interactive, web-friendly view: candlestick chart, sentiment distribution chart, readable news list with sentiment badges, company profile and raw JSON for debugging.
+- Support both a full analysis endpoint (news + model inference + charts) and a lightweight price-only endpoint for efficient real-time polling.
+- Keep the core ingestion and analysis logic reusable across UIs (Streamlit and Django) so the same functions can power different frontends.
+
+This repository is intended for experimentation and prototyping; it's not hardened for production use (no auth, limited rate-limiting, model loading occurs on first request). See "Development notes" and "Troubleshooting" for operational guidance.
+
 ## Quick features
 
 - Fetch historical price data (via `yfinance`).
