@@ -158,16 +158,4 @@ Contributions and issues are welcome. A typical workflow:
 2. Add tests for new behavior where appropriate.
 3. Open a pull request describing the change.
 
-## License
 
-This project does not include a license file. Add a `LICENSE` (for example MIT) to make usage terms explicit.
-
----
-
-If you want, I can also:
-
-- add a `requirements-dev.txt` and a small `Makefile`/`tasks.json` for common dev tasks,
-- add a minimal `tests/` folder with a basic smoke test for `get_stock_data` and `analyze_sentiment`, or
-- add a `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
-
-Tell me which of those you'd like next and I'll implement it.
