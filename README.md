@@ -1,6 +1,6 @@
 # Market Sentiment Analysis
 
-A compact Python project for fetching financial data and running AI-powered sentiment analysis on recent news for a given stock ticker. The app combines Yahoo Finance data, a FinBERT-based sentiment model from Hugging Face, and a Streamlit dashboard to visualize price history and recent news sentiment.
+A compact Python project for fetching financial data and running AI-powered sentiment analysis on recent news for a given stock ticker. The app combines Yahoo Finance data with a FinBERT-based sentiment model from Hugging Face and exposes results through a web UI (Django-based by default).
 
 ## Main objective
 
@@ -18,15 +18,16 @@ This repository is intended for experimentation and prototyping; it's not harden
 
 - Fetch historical price data (via `yfinance`).
 - Retrieve recent news items for a ticker and analyze sentiment using a FinBERT model (`ProsusAI/finbert`) via `transformers`.
-- Interactive Streamlit dashboard with candlestick chart, company profile, and news sentiment summaries.
+- Interactive web dashboard with candlestick chart, company profile, and news sentiment summaries (Django templates and Plotly on the client).
 
 ## Repository layout
 
-- `src/`
-	- `dashboard.py` — Streamlit app (entry point).
+- `src/` — core ingestion and analysis logic (re-usable between UIs):
 	- `data_ingestion.py` — helpers for fetching stock data, company info and news.
 	- `sentiment_analyzer.py` — loads the Hugging Face FinBERT pipeline and maps model outputs.
 	- `utils.py` — small utilities (logging, helpers).
+- `market_site/` — Django project scaffolding (development server and settings).
+- `sentiment/` — Django app that exposes the web UI and JSON endpoints (`/analyze/`, `/price/`).
 - `config/settings.py` — basic configuration (model name, etc.).
 - `requirements.txt` — Python dependencies.
 
@@ -64,21 +65,13 @@ SENTIMENT_MODEL_NAME = "ProsusAI/finbert"
 
 You can change the model name to another Hugging Face-compatible model if needed. Keep in mind some models require GPU or specific tokenizer handling.
 
-## Running the app (Streamlit)
+## Streamlit (removed / optional)
 
-Start the dashboard locally with Streamlit. From the repository root run:
-
-```powershell
-streamlit run src/dashboard.py
-```
-
-Default behavior:
-- Enter a stock ticker in the sidebar (e.g., AAPL, TSLA).
-- The app shows a candlestick chart, company profile, and recent news with sentiment labels and a sentiment distribution chart.
+This project now uses Django as the primary web UI. The Streamlit prototype that used to live in `src/dashboard.py` has been marked optional. If you do not need Streamlit, you can remove `src/dashboard.py` and delete `streamlit` from `requirements.txt` to keep the repository lean.
 
 Notes about model download and caching:
 - The FinBERT model is downloaded the first time the `transformers` pipeline is created. This requires internet connectivity and may take a minute.
-- The code uses Streamlit cache decorators to avoid reloading data/models repeatedly.
+- The core `src/` modules were made import-safe so they can be used under the Django app without Streamlit runtime present.
 
 ## Running the app (Django)
 
@@ -98,10 +91,11 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 
 # apply Django migrations (SQLite DB used by default)
-.\.venv\Scripts\python.exe manage.py migrate
+# using the convenience launcher `app.py`
+.\.venv\Scripts\python.exe app.py migrate
 
 # start the development server (binds to 127.0.0.1:8000 by default)
-.\.venv\Scripts\python.exe manage.py runserver
+.\.venv\Scripts\python.exe app.py runserver
 ```
 
 Open `http://127.0.0.1:8000/` in your browser. The default UI accepts a `ticker` and will call `/analyze/` to render the full page; the client also polls `/price/` for lightweight updates.
@@ -123,13 +117,17 @@ python -m pip install --upgrade -r requirements.txt
 ## Development notes
 
 - Code entry points:
-	- `src/dashboard.py` — UI and orchestration.
+	- `app.py` — convenience launcher for the Django dev server (aliases manage commands; defaults to `runserver`).
+	- `sentiment/services.py` — Django-side wrappers that call into `src/` and prepare JSON for templates.
 	- `src/data_ingestion.py` — contains `get_stock_data`, `get_company_info`, `get_stock_news`.
 	- `src/sentiment_analyzer.py` — contains `load_sentiment_model` and `analyze_sentiment`.
+	- `src/dashboard.py` — optional Streamlit prototype (kept for quick visualization experiments).
 
-- Caching in Streamlit is used to reduce calls to remote services. If you are iterating on the model or data functions, either restart Streamlit or clear the cache from the UI.
+- Caching and development notes:
+	- Streamlit caching was used in the prototype to reduce repeated downloads and model initialization. The `src/` helpers were made import-safe so they can be used by Django without Streamlit runtime.
+	- If you are iterating on model or data functions, restarting the Django devserver or clearing any Streamlit cache (if you run the prototype) ensures fresh behavior.
 
-- If you want to replace the sentiment pipeline with a different approach (local model, remote API), update `sentiment_analyzer.py` and keep the `analyze_sentiment(text, classifier)` contract:
+- If you want to replace the sentiment pipeline with a different approach (local model, remote API), update `src/sentiment_analyzer.py` and keep the `analyze_sentiment(text, classifier)` contract:
 
 	- inputs: `text: str`, `classifier: HF pipeline or similar`
 	- outputs: dict with keys `label` (one of `Positive`/`Negative`/`Neutral`) and `score` (float)
