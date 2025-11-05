@@ -1,3 +1,9 @@
+"""\
+© 2025 Nishant Kumar. Confidential and Proprietary.
+Unauthorized copying, distribution, modification, or use of this software
+is strictly prohibited without express written permission.
+"""
+
 import logging
 from pathlib import Path
 import importlib

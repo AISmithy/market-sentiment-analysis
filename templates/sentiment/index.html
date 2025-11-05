@@ -18,7 +18,30 @@
 
       <section id="price-chart" style="margin-top:0; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
         <h3 style="margin-top:0;">Historical Price Data (Candlestick)</h3>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <div id="history-tabs" style="display:flex; gap:8px;">
+            <button id="tab-chart" type="button" style="padding:6px 10px; font-weight:600;">Chart</button>
+            <button id="tab-table" type="button" style="padding:6px 10px;">Table</button>
+          </div>
+          <button id="download-csv" type="button" style="margin-left:auto; padding:6px 10px;">Download CSV</button>
+        </div>
+
         <div id="candlestick-chart" style="width:100%; height:420px;"></div>
+        <div id="history-table" style="display:none; margin-top:12px; max-height:420px; overflow:auto;">
+          <table id="history-data-table" style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+            <thead style="background:#f6f8fa; position:sticky; top:0;">
+              <tr>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e6e6e6;">Date</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e6e6e6;">Open</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e6e6e6;">High</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e6e6e6;">Low</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e6e6e6;">Close</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e6e6e6;">Volume</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <section style="display:flex; gap:16px; align-items:flex-start; margin-top:16px;">
@@ -229,6 +252,8 @@
           } else {
             document.getElementById('candlestick-chart').textContent = hist.length ? 'Plotly unavailable' : 'No historical data';
           }
+          // render history table
+          renderHistoryTable(hist);
         }catch(e){
           console.error('Candlestick chart error', e);
         }
@@ -285,5 +310,81 @@
 
     // start polling interval
     setInterval(pollPrice, 30000);
+
+    // --- History table and tabs ---
+    const tabChart = document.getElementById('tab-chart');
+    const tabTable = document.getElementById('tab-table');
+    const candlestickDiv = document.getElementById('candlestick-chart');
+    const historyTableWrap = document.getElementById('history-table');
+    const historyTbody = document.querySelector('#history-data-table tbody');
+    const downloadBtn = document.getElementById('download-csv');
+
+    function clearHistoryTable(){
+      historyTbody.innerHTML = '';
+    }
+
+    function renderHistoryTable(hist){
+      clearHistoryTable();
+      if(!hist || hist.length === 0){
+        historyTbody.innerHTML = '<tr><td colspan="6" style="padding:8px; color:#666;">No historical data available.</td></tr>';
+        return;
+      }
+      // show most recent first
+      const rows = hist.slice().reverse();
+      const frag = document.createDocumentFragment();
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding:8px; border-bottom:1px solid #eee;">${r.date}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${r.open != null ? r.open.toFixed(2) : ''}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${r.high != null ? r.high.toFixed(2) : ''}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${r.low != null ? r.low.toFixed(2) : ''}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${r.close != null ? r.close.toFixed(2) : ''}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${r.volume != null ? r.volume.toLocaleString() : ''}</td>
+        `;
+        frag.appendChild(tr);
+      });
+      historyTbody.appendChild(frag);
+    }
+
+    function switchToTab(tab){
+      if(tab === 'table'){
+        candlestickDiv.style.display = 'none';
+        historyTableWrap.style.display = 'block';
+        tabChart.style.fontWeight = '400';
+        tabTable.style.fontWeight = '700';
+      } else {
+        candlestickDiv.style.display = 'block';
+        historyTableWrap.style.display = 'none';
+        tabChart.style.fontWeight = '700';
+        tabTable.style.fontWeight = '400';
+      }
+    }
+
+    tabChart.addEventListener('click', () => switchToTab('chart'));
+    tabTable.addEventListener('click', () => switchToTab('table'));
+
+    downloadBtn.addEventListener('click', () => {
+      // build CSV from table
+      const rows = Array.from(document.querySelectorAll('#history-data-table tr'));
+      if(rows.length === 0) return;
+      const csv = [];
+      rows.forEach((r, idx) => {
+        const cols = Array.from(r.querySelectorAll('th, td')).map(c => '"' + c.textContent.replace(/"/g, '""') + '"');
+        if(cols.length) csv.push(cols.join(','));
+      });
+      const blob = new Blob([csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${document.getElementById('ticker').value.trim() || 'history'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // default to chart view
+    switchToTab('chart');
   </script>
 {% endblock %}

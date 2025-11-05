@@ -1,13 +1,10 @@
 #!/usr/bin/env python
+"""\
+© 2025 Nishant Kumar. Confidential and Proprietary.
+Unauthorized copying, distribution, modification, or use of this software
+is strictly prohibited without express written permission.
 """
-Convenience launcher for the Django development server.
 
-Usage:
-    python app.py             # starts the dev server (equivalent to `manage.py runserver`)
-    python app.py 0.0.0.0:8000 # pass host:port or other manage.py args through
-
-This is a small wrapper so contributors can run the app with a single file.
-"""
 import os
 import sys
 

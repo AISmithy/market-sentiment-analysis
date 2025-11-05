@@ -1,3 +1,9 @@
+"""\
+© 2025 Nishant Kumar. Confidential and Proprietary.
+Unauthorized copying, distribution, modification, or use of this software
+is strictly prohibited without express written permission.
+"""
+
 import yfinance as yf
 from yahoo_fin import news as yf_news
 

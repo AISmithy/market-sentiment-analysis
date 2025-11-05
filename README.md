@@ -100,6 +100,76 @@ python -m pip install -r requirements.txt
 
 Open `http://127.0.0.1:8000/` in your browser. The default UI accepts a `ticker` and will call `/analyze/` to render the full page; the client also polls `/price/` for lightweight updates.
 
+### History endpoint
+
+You can now fetch historical OHLCV data via the lightweight `/history/` endpoint. Example:
+
+GET (curl):
+
+```powershell
+curl "http://127.0.0.1:8000/history/?ticker=AAPL&period=6mo&interval=1d"
+```
+
+Python (requests):
+
+```python
+import requests
+r = requests.get('http://127.0.0.1:8000/history/', params={'ticker':'AAPL','period':'6mo','interval':'1d'})
+data = r.json()
+history = data.get('history', [])
+print(len(history), history[:2])
+```
+
+Query params supported: `ticker` (required), `period` (default `1y`), `interval` (default `1d`), `start` and `end` (ISO YYYY-MM-DD to override period).
+
+Note: the `/history/` endpoint uses a short server-side cache to reduce repeated calls to external services — results are cached in-memory for 300 seconds by default. This cache is lightweight and intended for development; for production consider using Django's cache framework or an external cache (Redis/Memcached) for persistence and multi-process sharing.
+
+Bypass cache:
+
+You can force the `/history/` endpoint to bypass the server cache by adding `?nocache=1` to the request. Example:
+
+```powershell
+curl "http://127.0.0.1:8000/history/?ticker=AAPL&period=6mo&interval=1d&nocache=1"
+```
+
+Running with Redis (recommended for multi-process deployments):
+
+1. Install `django-redis` into your virtualenv:
+
+```powershell
+python -m pip install django-redis
+```
+
+2. Start Redis and the web service using the provided `docker-compose.yml` example (it sets REDIS_URL for the web container):
+
+```powershell
+docker-compose up --build
+```
+
+3. When using Redis, the Django cache backend will be used and the `/history/` results will be stored in Redis and available to all web workers. The local in-memory index/enforcement is only used for the default locmem backend.
+
+Management command: clear_history_cache
+
+There is a management command to clear history-related cache keys. It works with Redis (via `django-redis`) or the default locmem index:
+
+```powershell
+# clear keys matching the default pattern (history:*)
+python app.py clear_history_cache
+
+# specify a different pattern
+python app.py clear_history_cache --pattern "history:*"
+```
+
+Docker Compose
+
+An example `docker-compose.yml` and `Dockerfile` are provided to run Redis and a web image with the application's Python requirements preinstalled. To run the stack:
+
+```powershell
+docker-compose up --build
+```
+
+This builds the `web` image (installs `requirements.txt` into a virtualenv inside the image) and starts Redis and the Django dev server bound to 0.0.0.0:8000. The `REDIS_URL` environment variable is passed into the container so Django will pick the Redis cache backend automatically.
+
 Notes:
 - The first request that triggers model loading may be slow while the FinBERT weights download. Consider pre-warming the model in a background task if you plan to serve many users.
 - The Django app is intended for local development and prototyping; production deployment needs additional work (WSGI/ASGI configuration, reverse proxy, caching, and security).

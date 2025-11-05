@@ -1,3 +1,9 @@
+"""\
+© 2025 Nishant Kumar. Confidential and Proprietary.
+Unauthorized copying, distribution, modification, or use of this software
+is strictly prohibited without express written permission.
+"""
+
 import os
 from pathlib import Path
 
@@ -72,3 +78,27 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Cache configuration: by default use local-memory cache. To use Redis set REDIS_URL
+REDIS_URL = os.environ.get('REDIS_URL')  # e.g. 'redis://redis:6379/1'
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            }
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-sentiment-cache',
+        }
+    }
+
+# History cache settings (can be overridden with env vars)
+HISTORY_CACHE_TTL = int(os.environ.get('HISTORY_CACHE_TTL', '300'))
+HISTORY_CACHE_MAX_ITEMS = int(os.environ.get('HISTORY_CACHE_MAX_ITEMS', '200'))
