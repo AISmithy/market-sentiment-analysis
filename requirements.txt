@@ -9,3 +9,5 @@ transformers
 torch
 accelerate
 django
+tensorflow
+scikit-learn
