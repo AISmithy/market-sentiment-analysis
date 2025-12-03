@@ -26,10 +26,16 @@ This repository is intended for experimentation and prototyping; it's not harden
 	- `data_ingestion.py` — helpers for fetching stock data, company info and news.
 	- `sentiment_analyzer.py` — loads the Hugging Face FinBERT pipeline and maps model outputs.
 	- `utils.py` — small utilities (logging, helpers).
+	- `dashboard.py` — optional Streamlit prototype for quick visualization.
+- `script/` — standalone utility scripts for model evaluation and dataset creation:
+	- `baseline_finbert_eval.py` — evaluate FinBERT on labeled headline datasets; outputs metrics, confusion matrix, and optional APA-formatted .docx report.
+	- `build_silver_dataset.py` — fetch news for a ticker and label each headline with FinBERT sentiment; saves CSV for training/evaluation.
 - `market_site/` — Django project scaffolding (development server and settings).
 - `sentiment/` — Django app that exposes the web UI and JSON endpoints (`/analyze/`, `/price/`).
+- `templates/sentiment/` — Django HTML templates for the web UI.
 - `config/settings.py` — basic configuration (model name, etc.).
 - `requirements.txt` — Python dependencies.
+- `.gitignore` — excludes cache, reports, build artifacts, and virtual environments from git tracking.
 
 ## Requirements
 
@@ -38,7 +44,11 @@ This repository is intended for experimentation and prototyping; it's not harden
 
 Python dependencies are listed in `requirements.txt` and include:
 
-- pandas, yfinance, yahoo_fin, streamlit, plotly, transformers, torch, accelerate
+- **Data & Finance**: pandas, yfinance, yahoo_fin
+- **Web/UI**: django, streamlit, plotly
+- **ML/NLP**: transformers, torch, accelerate
+- **Evaluation**: matplotlib, scikit-learn
+- **Reporting**: python-docx
 
 Install them with pip:
 
@@ -64,14 +74,6 @@ SENTIMENT_MODEL_NAME = "ProsusAI/finbert"
 ```
 
 You can change the model name to another Hugging Face-compatible model if needed. Keep in mind some models require GPU or specific tokenizer handling.
-
-## Streamlit (removed / optional)
-
-This project now uses Django as the primary web UI. The Streamlit prototype that used to live in `src/dashboard.py` has been marked optional. If you do not need Streamlit, you can remove `src/dashboard.py` and delete `streamlit` from `requirements.txt` to keep the repository lean.
-
-Notes about model download and caching:
-- The FinBERT model is downloaded the first time the `transformers` pipeline is created. This requires internet connectivity and may take a minute.
-- The core `src/` modules were made import-safe so they can be used under the Django app without Streamlit runtime present.
 
 ## Running the app (Django)
 
@@ -114,13 +116,29 @@ python -m pip install --upgrade -r requirements.txt
 
 - Run a quick smoke test (start the app and try a ticker like `AAPL`).
 
+- Evaluate the FinBERT baseline on a labeled CSV:
+
+```powershell
+python script/baseline_finbert_eval.py --data data/headlines.csv --out runs/baseline_eval
+```
+
+- Build a labeled dataset from news headlines:
+
+```powershell
+python script/build_silver_dataset.py --ticker AAPL --out data/aapl_headlines.csv --limit 300
+```
+
 ## Development notes
 
 - Code entry points:
 	- `app.py` — convenience launcher for the Django dev server (aliases manage commands; defaults to `runserver`).
+	- `manage.py` — standard Django management script.
 	- `sentiment/services.py` — Django-side wrappers that call into `src/` and prepare JSON for templates.
+	- `sentiment/views.py` — Django views that handle `/analyze/` and `/price/` endpoints.
 	- `src/data_ingestion.py` — contains `get_stock_data`, `get_company_info`, `get_stock_news`.
 	- `src/sentiment_analyzer.py` — contains `load_sentiment_model` and `analyze_sentiment`.
+	- `script/baseline_finbert_eval.py` — standalone evaluation script (requires sklearn, matplotlib, python-docx).
+	- `script/build_silver_dataset.py` — standalone script to build labeled datasets from news.
 	- `src/dashboard.py` — optional Streamlit prototype (kept for quick visualization experiments).
 
 - Caching and development notes:
@@ -131,6 +149,10 @@ python -m pip install --upgrade -r requirements.txt
 
 	- inputs: `text: str`, `classifier: HF pipeline or similar`
 	- outputs: dict with keys `label` (one of `Positive`/`Negative`/`Neutral`) and `score` (float)
+
+- Git and artifacts:
+	- The `.gitignore` file excludes cache/, reports/, runs/, __pycache__/, .venv/, and other temporary artifacts.
+	- All evaluation outputs (confusion matrices, metrics, reports) are saved to `runs/` or `reports/` and are not tracked in git.
 
 ## Troubleshooting
 
@@ -147,6 +169,12 @@ python -m pip install --upgrade -r requirements.txt
 ## Tests
 
 This repository does not include automated tests yet. For small additions, add unit tests under a `tests/` folder and run them with `pytest`.
+
+Smoke test:
+```powershell
+# Import all modules and validate they load without error
+python -c "from src.data_ingestion import get_stock_news; from src.sentiment_analyzer import load_sentiment_model; print('All modules OK')"
+```
 
 ## Contributing
 
