@@ -10,7 +10,7 @@ The primary goal of this project is to provide a lightweight, reproducible pipel
 - Collect recent news items about the company and score each item for sentiment (Positive/Negative/Neutral) using a FinBERT model from Hugging Face.
 - Present the results in an interactive, web-friendly view: candlestick chart, sentiment distribution chart, readable news list with sentiment badges, company profile and raw JSON for debugging.
 - Support both a full analysis endpoint (news + model inference + charts) and a lightweight price-only endpoint for efficient real-time polling.
-- Keep the core ingestion and analysis logic reusable across UIs (Streamlit and Django) so the same functions can power different frontends.
+	- Keep the core ingestion and analysis logic reusable so the same functions can power different UIs.
 
 This repository is intended for experimentation and prototyping; it's not hardened for production use (no auth, limited rate-limiting, model loading occurs on first request). See "Development notes" and "Troubleshooting" for operational guidance.
 
@@ -26,7 +26,6 @@ This repository is intended for experimentation and prototyping; it's not harden
 	- `data_ingestion.py` — helpers for fetching stock data, company info and news.
 	- `sentiment_analyzer.py` — loads the Hugging Face FinBERT pipeline and maps model outputs.
 	- `utils.py` — small utilities (logging, helpers).
-	- `dashboard.py` — optional Streamlit prototype for quick visualization.
 - `script/` — standalone utility scripts for model evaluation and dataset creation:
 	- `baseline_finbert_eval.py` — evaluate FinBERT on labeled headline datasets; outputs metrics, confusion matrix, and optional APA-formatted .docx report.
 	- `build_silver_dataset.py` — fetch news for a ticker and label each headline with FinBERT sentiment; saves CSV for training/evaluation.
@@ -45,7 +44,7 @@ This repository is intended for experimentation and prototyping; it's not harden
 Python dependencies are listed in `requirements.txt` and include:
 
 - **Data & Finance**: pandas, yfinance, yahoo_fin
-- **Web/UI**: django, streamlit, plotly
+- **Web/UI**: django, plotly
 - **ML/NLP**: transformers, torch, accelerate
 - **Evaluation**: matplotlib, scikit-learn
 - **Reporting**: python-docx
@@ -139,11 +138,9 @@ python script/build_silver_dataset.py --ticker AAPL --out data/aapl_headlines.cs
 	- `src/sentiment_analyzer.py` — contains `load_sentiment_model` and `analyze_sentiment`.
 	- `script/baseline_finbert_eval.py` — standalone evaluation script (requires sklearn, matplotlib, python-docx).
 	- `script/build_silver_dataset.py` — standalone script to build labeled datasets from news.
-	- `src/dashboard.py` — optional Streamlit prototype (kept for quick visualization experiments).
-
 - Caching and development notes:
-	- Streamlit caching was used in the prototype to reduce repeated downloads and model initialization. The `src/` helpers were made import-safe so they can be used by Django without Streamlit runtime.
-	- If you are iterating on model or data functions, restarting the Django devserver or clearing any Streamlit cache (if you run the prototype) ensures fresh behavior.
+	- The `src/` helpers are import-safe and can be used independently by Django or other UIs.
+	- If you are iterating on model or data functions, restarting the Django devserver ensures fresh behavior.
 
 - If you want to replace the sentiment pipeline with a different approach (local model, remote API), update `src/sentiment_analyzer.py` and keep the `analyze_sentiment(text, classifier)` contract:
 
@@ -162,9 +159,6 @@ python script/build_silver_dataset.py --ticker AAPL --out data/aapl_headlines.cs
 
 - No news / empty responses:
 	- Yahoo RSS feeds and `yahoo_fin` rely on the external service; if a ticker returns no news the app will show an empty list.
-
-- Streamlit shows cached / stale data:
-	- Use the Streamlit menu to "Clear cache" or restart the app.
 
 ## Tests
 
