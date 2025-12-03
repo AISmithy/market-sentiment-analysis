@@ -1,0 +1,40 @@
+# Cache and reports
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Django
+*.log
+db.sqlite3
+/media/
+/static/
+
+# Project-specific
+cache/
+reports/
+runs/
+*.pth
+*.model
+.cache/
