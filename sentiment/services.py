@@ -1,20 +1,32 @@
 import logging
 from pathlib import Path
 import importlib
+import sys
 
 logger = logging.getLogger(__name__)
 
-# Try to import the existing src modules (they are not a package, so adapt import path)
-try:
-    import src.data_ingestion as data_ingestion
-    import src.sentiment_analyzer as sentiment_analyzer
-except Exception:
-    # If direct import fails, try relative location
+
+def _import_src_module(mod_name: str):
+    """Import a module from the top-level `src` package.
+
+    Tries an absolute import first (recommended). If that fails, adds the
+    project root to sys.path and retries once. Returns the module or None.
+    """
     try:
-        from ..src import data_ingestion, sentiment_analyzer
+        return importlib.import_module(f"src.{mod_name}")
     except Exception:
-        data_ingestion = None
-        sentiment_analyzer = None
+        # Attempt to add project root to sys.path and retry
+        try:
+            root = Path(__file__).resolve().parents[1]
+            if str(root) not in sys.path:
+                sys.path.insert(0, str(root))
+            return importlib.import_module(f"src.{mod_name}")
+        except Exception:
+            return None
+
+
+data_ingestion = _import_src_module("data_ingestion")
+sentiment_analyzer = _import_src_module("sentiment_analyzer")
 
 
 def get_company_data(ticker):

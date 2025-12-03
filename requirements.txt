@@ -9,3 +9,6 @@ transformers
 torch
 accelerate
 django
+matplotlib
+scikit-learn
+python-docx
