@@ -75,14 +75,6 @@ SENTIMENT_MODEL_NAME = "ProsusAI/finbert"
 
 You can change the model name to another Hugging Face-compatible model if needed. Keep in mind some models require GPU or specific tokenizer handling.
 
-## Streamlit (removed / optional)
-
-This project now uses Django as the primary web UI. The Streamlit prototype that used to live in `src/dashboard.py` has been marked optional. If you do not need Streamlit, you can remove `src/dashboard.py` and delete `streamlit` from `requirements.txt` to keep the repository lean.
-
-Notes about model download and caching:
-- The FinBERT model is downloaded the first time the `transformers` pipeline is created. This requires internet connectivity and may take a minute.
-- The core `src/` modules were made import-safe so they can be used under the Django app without Streamlit runtime present.
-
 ## Running the app (Django)
 
 This repository also includes a minimal Django app that wraps the same ingestion and analysis logic and provides two HTTP endpoints useful for web UIs:
