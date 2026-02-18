@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import importlib
 import sys
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -98,105 +99,258 @@ def analyze_news_for_ticker(ticker):
         return []
 
 
-def compute_risk_score(news_items):
-    """
-    Compute a short-term risk score (0-100) based on recent news sentiment.
-    
-    Risk scoring logic:
-    - Negative sentiment: increases risk
-    - Neutral sentiment: neutral risk
-    - Positive sentiment: decreases risk
-    
-    Returns a dict with:
-    - risk_score: 0-100 (0=low risk, 100=high risk)
-    - risk_level: 'low', 'medium', 'high'
-    - sentiment_counts: dict with counts by sentiment
-    """
+def _risk_level_from_score(risk_score):
+    if risk_score < 33:
+        return 'low'
+    if risk_score < 67:
+        return 'medium'
+    return 'high'
+
+
+def _parse_published_date(published_str):
+    if not published_str:
+        return None
+
+    raw = str(published_str).strip()
+    try:
+        # ISO date/time path.
+        return datetime.fromisoformat(raw.replace('Z', '+00:00')).date().isoformat()
+    except Exception:
+        pass
+
+    # Common RSS formats used by Yahoo feeds.
+    patterns = [
+        '%a, %d %b %Y %H:%M:%S %Z',
+        '%a, %d %b %Y %H:%M:%S',
+        '%a, %d %b %Y',
+        '%Y-%m-%d',
+    ]
+    for fmt in patterns:
+        try:
+            return datetime.strptime(raw.replace('GMT', '').strip(), fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _sentiment_signal(item):
+    label = (item.get('sentiment_label') or 'Neutral').lower()
+    score = float(item.get('sentiment_score') or 0.0)
+    if label.startswith('posit'):
+        return score
+    if label.startswith('neg'):
+        return -score
+    return 0.0
+
+
+def _compute_heuristic_risk(news_items):
     if not news_items:
-        # No news = moderate risk (unknown)
-        risk_score = 50.0
-        risk_level = 'medium'
         sentiment_counts = {'positive': 0, 'negative': 0, 'neutral': 0}
         return {
-            'risk_score': risk_score,
-            'risk_level': risk_level,
+            'risk_score': 50.0,
+            'risk_level': 'medium',
             'sentiment_counts': sentiment_counts,
-            'risk_explanation': explain_risk_meter(
-                risk_score=risk_score,
-                risk_level=risk_level,
-                sentiment_counts=sentiment_counts,
-                total_items=0,
-                base_risk=50.0,
-                ratio_adjustment=0.0,
-                confidence_adjustment=0.0,
-            ),
+            'diagnostics': {
+                'total_items': 0,
+                'base_risk': 50.0,
+                'ratio_adjustment': 0.0,
+                'confidence_adjustment': 0.0,
+            },
         }
-    
+
     positive_count = 0
     negative_count = 0
     neutral_count = 0
     weighted_score = 0.0
-    
+
     for item in news_items:
         label = (item.get('sentiment_label') or 'Neutral').lower()
         score = item.get('sentiment_score') or 0.0
-        
+
         if label.startswith('posit'):
             positive_count += 1
-            # Positive sentiment reduces risk: lower contribution
-            weighted_score -= score * 25  # Positive contributions reduce the base
+            weighted_score -= score * 25
         elif label.startswith('neg'):
             negative_count += 1
-            # Negative sentiment increases risk: higher contribution
-            weighted_score += score * 50  # Negative contributions increase risk more
+            weighted_score += score * 50
         else:
             neutral_count += 1
-            # Neutral sentiment has minimal impact
             weighted_score += score * 5
-    
-    # Normalize: base risk is 50, then adjust based on sentiment distribution
-    base_risk = 50
-    
-    # Calculate average sentiment impact
+
+    base_risk = 50.0
     total_items = len(news_items)
-    positive_ratio = positive_count / total_items if total_items > 0 else 0
-    negative_ratio = negative_count / total_items if total_items > 0 else 0
-    
-    # Adjust risk based on sentiment ratios
-    risk_adjustment = (negative_ratio * 40) - (positive_ratio * 25)
-    risk_score = base_risk + risk_adjustment + (weighted_score / max(total_items, 1))
-    
-    # Clamp to 0-100
-    risk_score = max(0, min(100, risk_score))
-    
-    # Determine risk level
-    if risk_score < 33:
-        risk_level = 'low'
-    elif risk_score < 67:
-        risk_level = 'medium'
-    else:
-        risk_level = 'high'
-    
+    positive_ratio = positive_count / total_items if total_items > 0 else 0.0
+    negative_ratio = negative_count / total_items if total_items > 0 else 0.0
+    ratio_adjustment = (negative_ratio * 40) - (positive_ratio * 25)
+    confidence_adjustment = weighted_score / max(total_items, 1)
+
+    risk_score = base_risk + ratio_adjustment + confidence_adjustment
+    risk_score = max(0.0, min(100.0, risk_score))
+
     sentiment_counts = {
         'positive': positive_count,
         'negative': negative_count,
-        'neutral': neutral_count
+        'neutral': neutral_count,
     }
-    rounded_score = round(risk_score, 1)
-    confidence_adjustment = weighted_score / max(total_items, 1)
-
     return {
-        'risk_score': rounded_score,
-        'risk_level': risk_level,
+        'risk_score': round(risk_score, 1),
+        'risk_level': _risk_level_from_score(risk_score),
         'sentiment_counts': sentiment_counts,
+        'diagnostics': {
+            'total_items': total_items,
+            'base_risk': base_risk,
+            'ratio_adjustment': ratio_adjustment,
+            'confidence_adjustment': confidence_adjustment,
+        },
+    }
+
+
+def _compute_predictive_risk(news_items, history, horizon_days=3, adverse_move_pct=0.02):
+    """
+    Estimate adverse-move probability using historical mapping:
+    daily sentiment signal -> forward 1-3 day downside event.
+    """
+    if not news_items or not history:
+        return {'available': False, 'reason': 'missing_inputs'}
+
+    # Build per-day sentiment signal from published headlines.
+    signals_by_day = {}
+    all_signals = []
+    for item in news_items:
+        day = _parse_published_date(item.get('published'))
+        if not day:
+            continue
+        signal = _sentiment_signal(item)
+        all_signals.append(signal)
+        signals_by_day.setdefault(day, []).append(signal)
+
+    if not signals_by_day or not all_signals:
+        return {'available': False, 'reason': 'insufficient_sentiment_dates'}
+
+    daily_signal = {day: (sum(vals) / len(vals)) for day, vals in signals_by_day.items()}
+    current_signal = sum(all_signals) / len(all_signals)
+
+    # Parse close series from serialized history.
+    close_by_day = {}
+    for row in history:
+        date_raw = row.get('date')
+        close_val = row.get('close')
+        if close_val is None or date_raw is None:
+            continue
+        day = str(date_raw)[:10]
+        try:
+            close_by_day[day] = float(close_val)
+        except (TypeError, ValueError):
+            continue
+
+    ordered_days = sorted(close_by_day.keys())
+    if len(ordered_days) < 8:
+        return {'available': False, 'reason': 'insufficient_price_history'}
+
+    day_to_index = {d: i for i, d in enumerate(ordered_days)}
+    X = []
+    y = []
+    for day, signal in daily_signal.items():
+        idx = day_to_index.get(day)
+        if idx is None:
+            continue
+        future_days = ordered_days[idx + 1: idx + 1 + max(1, horizon_days)]
+        if not future_days:
+            continue
+
+        base_close = close_by_day.get(day)
+        if not base_close or base_close <= 0:
+            continue
+        future_min = min(close_by_day[d] for d in future_days)
+        forward_min_return = (future_min - base_close) / base_close
+        adverse = 1 if forward_min_return <= -abs(adverse_move_pct) else 0
+
+        X.append([signal])
+        y.append(adverse)
+
+    min_samples = 10
+    if len(X) < min_samples or len(set(y)) < 2:
+        return {
+            'available': False,
+            'reason': 'insufficient_labeled_days',
+            'samples': len(X),
+        }
+
+    try:
+        from sklearn.linear_model import LogisticRegression
+
+        model = LogisticRegression(
+            class_weight='balanced',
+            random_state=42,
+            max_iter=1000,
+            solver='lbfgs',
+        )
+        model.fit(X, y)
+        risk_prob = float(model.predict_proba([[current_signal]])[0][1])
+    except Exception as e:
+        logger.debug(f"Predictive risk model unavailable: {e}")
+        return {'available': False, 'reason': 'model_fit_failed'}
+
+    risk_score = round(max(0.0, min(100.0, risk_prob * 100.0)), 1)
+    return {
+        'available': True,
+        'risk_score': risk_score,
+        'risk_level': _risk_level_from_score(risk_score),
+        'samples': len(X),
+        'event_rate': round(sum(y) / len(y), 3),
+        'current_signal': round(current_signal, 4),
+        'horizon_days': int(horizon_days),
+        'adverse_move_pct': float(adverse_move_pct),
+    }
+
+
+def compute_risk_score(news_items, history=None):
+    """
+    Compute short-horizon risk score (0-100) with predictive calibration.
+
+    Primary path:
+    - Learn mapping from daily sentiment to forward 1-3 day adverse returns.
+    - Output adverse-move probability as risk score (0-100).
+
+    Fallback path:
+    - Use heuristic sentiment-only score if predictive calibration is unavailable.
+    """
+    heuristic = _compute_heuristic_risk(news_items)
+    predictive = _compute_predictive_risk(news_items, history, horizon_days=3, adverse_move_pct=0.02)
+
+    if predictive.get('available'):
+        return {
+            'risk_score': predictive['risk_score'],
+            'risk_level': predictive['risk_level'],
+            'sentiment_counts': heuristic['sentiment_counts'],
+            'risk_method': 'predictive',
+            'risk_explanation': explain_predictive_risk(
+                risk_score=predictive['risk_score'],
+                risk_level=predictive['risk_level'],
+                sentiment_counts=heuristic['sentiment_counts'],
+                samples=predictive['samples'],
+                event_rate=predictive['event_rate'],
+                current_signal=predictive['current_signal'],
+                horizon_days=predictive['horizon_days'],
+                adverse_move_pct=predictive['adverse_move_pct'],
+            ),
+        }
+
+    diagnostics = heuristic['diagnostics']
+    return {
+        'risk_score': heuristic['risk_score'],
+        'risk_level': heuristic['risk_level'],
+        'sentiment_counts': heuristic['sentiment_counts'],
+        'risk_method': 'heuristic',
         'risk_explanation': explain_risk_meter(
-            risk_score=rounded_score,
-            risk_level=risk_level,
-            sentiment_counts=sentiment_counts,
-            total_items=total_items,
-            base_risk=base_risk,
-            ratio_adjustment=risk_adjustment,
-            confidence_adjustment=confidence_adjustment,
+            risk_score=heuristic['risk_score'],
+            risk_level=heuristic['risk_level'],
+            sentiment_counts=heuristic['sentiment_counts'],
+            total_items=diagnostics['total_items'],
+            base_risk=diagnostics['base_risk'],
+            ratio_adjustment=diagnostics['ratio_adjustment'],
+            confidence_adjustment=diagnostics['confidence_adjustment'],
+            fallback_reason=predictive.get('reason', 'unknown'),
         ),
     }
 
@@ -209,6 +363,7 @@ def explain_risk_meter(
     base_risk,
     ratio_adjustment,
     confidence_adjustment,
+    fallback_reason=None,
 ):
     """
     Build a human-readable explanation of how the risk score was determined.
@@ -218,8 +373,11 @@ def explain_risk_meter(
     neutral = int(sentiment_counts.get('neutral', 0) or 0)
 
     if total_items <= 0:
+        summary = 'No recent articles were found, so the meter defaults to Medium risk (50/100).'
+        if fallback_reason:
+            summary = f"{summary} Predictive model fallback reason: {fallback_reason}."
         return {
-            'summary': 'No recent articles were found, so the meter defaults to Medium risk (50/100).',
+            'summary': summary,
             'components': [
                 'Base risk: 50.0',
                 'Ratio adjustment: +0.0 (no news mix available)',
@@ -236,6 +394,8 @@ def explain_risk_meter(
         f"{risk_level.title()} risk ({risk_score}/100) from {total_items} recent articles: "
         f"{negative} negative, {neutral} neutral, {positive} positive."
     )
+    if fallback_reason:
+        summary = f"{summary} (Fallback method used: {fallback_reason}.)"
     components = [
         f"Base risk: {base_risk:.1f}",
         f"Ratio adjustment: {ratio_sign}{ratio_adjustment:.1f} "
@@ -249,6 +409,33 @@ def explain_risk_meter(
         'summary': summary,
         'components': components,
     }
+
+
+def explain_predictive_risk(
+    risk_score,
+    risk_level,
+    sentiment_counts,
+    samples,
+    event_rate,
+    current_signal,
+    horizon_days,
+    adverse_move_pct,
+):
+    positive = int(sentiment_counts.get('positive', 0) or 0)
+    negative = int(sentiment_counts.get('negative', 0) or 0)
+    neutral = int(sentiment_counts.get('neutral', 0) or 0)
+    summary = (
+        f"{risk_level.title()} predictive risk ({risk_score}/100) for the next {horizon_days} day(s), "
+        f"estimated from sentiment-to-return calibration."
+    )
+    components = [
+        f"Training samples: {samples} sentiment days",
+        f"Adverse move definition: <= -{adverse_move_pct * 100:.1f}% within {horizon_days} day(s)",
+        f"Observed adverse event rate in training: {event_rate * 100:.1f}%",
+        f"Current sentiment signal: {current_signal:+.3f} "
+        f"(from {negative} negative, {neutral} neutral, {positive} positive headlines)",
+    ]
+    return {'summary': summary, 'components': components}
 
 
 def compute_daily_sentiment_stats(news_items):

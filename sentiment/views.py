@@ -39,8 +39,11 @@ def analyze(request):
 
     news = analyze_news_for_ticker(ticker)
 
-    # Compute risk score based on sentiment
-    risk_data = compute_risk_score(news)
+    # Compute risk score (predictive when history is available)
+    history = None
+    if isinstance(company_data, dict):
+        history = company_data.get('history')
+    risk_data = compute_risk_score(news, history=history)
 
     # Compute daily sentiment statistics
     daily_stats = compute_daily_sentiment_stats(news)
@@ -67,11 +70,6 @@ def analyze(request):
             'price_change_pct': 0.0
         }
 
-    # Include serialized history if available from the service
-    history = None
-    if isinstance(company_data, dict):
-        history = company_data.get('history')
-
     data = {
         'ticker': ticker,
         'company': company,
@@ -83,6 +81,7 @@ def analyze(request):
         'risk_level': risk_data['risk_level'],
         'risk_sentiment_counts': risk_data['sentiment_counts'],
         'risk_explanation': risk_data.get('risk_explanation'),
+        'risk_method': risk_data.get('risk_method'),
         'daily_stats': daily_stats_list,
         'ticker_suggestions': ticker_suggestions,
         'regime': regime_data,
@@ -103,7 +102,8 @@ def price(request):
 
     # Include risk score (requires fetching news)
     news = analyze_news_for_ticker(ticker)
-    risk_data = compute_risk_score(news)
+    history = company_data.get('history') if isinstance(company_data, dict) else None
+    risk_data = compute_risk_score(news, history=history)
 
     data = {
         'ticker': ticker,
@@ -115,6 +115,7 @@ def price(request):
         'risk_level': risk_data['risk_level'],
         'risk_sentiment_counts': risk_data['sentiment_counts'],
         'risk_explanation': risk_data.get('risk_explanation'),
+        'risk_method': risk_data.get('risk_method'),
     }
     return JsonResponse(data)
 
