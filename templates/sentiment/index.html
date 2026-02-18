@@ -556,8 +556,13 @@
 
         // Company card (styled header)
         const c = data.company || {};
+        const regime = data.regime || { regime: 'Unknown', color: '#999' };
+        
         const title = document.createElement('div');
-        title.innerHTML = `<h2 style="margin:0 0 8px 0; font-size:1.8rem; font-weight:700;">${data.ticker}</h2>
+        title.innerHTML = `<div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+          <h2 style="margin:0; font-size:1.8rem; font-weight:700;">${data.ticker}</h2>
+          <div style="display:inline-block; padding:4px 10px; border-radius:16px; background:${regime.color}; color:white; font-size:0.75rem; font-weight:600; white-space:nowrap;">${regime.regime}</div>
+        </div>
           <p style="margin:0 0 12px 0; font-size:1.1rem; opacity:0.9;">${c.name ?? 'Unknown Company'}</p>`;
         
         // last-updated element

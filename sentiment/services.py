@@ -366,3 +366,105 @@ def get_ticker_suggestions_with_sentiment(ticker):
             continue
     
     return suggestions
+
+
+def compute_regime(company_data, news_items):
+    """
+    Compute market regime label based on price trend and sentiment.
+    
+    Analyzes price history to determine trend (bullish/bearish/sideways)
+    and compares with sentiment distribution to identify convergence or divergence.
+    
+    Returns dict with:
+    - regime: string label (e.g., "Bullish + Positive", "Bearish / Negative Divergence")
+    - trend: 'bullish', 'bearish', or 'sideways'
+    - sentiment_bias: 'positive', 'negative', or 'mixed'
+    - color: CSS color for chip (green, red, orange, yellow)
+    """
+    # Determine price trend from historical data
+    trend = 'sideways'
+    price_change_pct = 0.0
+    
+    try:
+        if isinstance(company_data, dict):
+            history = company_data.get('history')
+            if history and len(history) > 1:
+                # Get first and last prices from history
+                try:
+                    first_price = float(history[0].get('close', history[0].get('o')))
+                    last_price = float(history[-1].get('close', history[-1].get('c')))
+                    if first_price > 0:
+                        price_change_pct = ((last_price - first_price) / first_price) * 100
+                        
+                        if price_change_pct > 2:
+                            trend = 'bullish'
+                        elif price_change_pct < -2:
+                            trend = 'bearish'
+                        else:
+                            trend = 'sideways'
+                except (ValueError, KeyError, TypeError):
+                    trend = 'sideways'
+    except Exception as e:
+        logger.debug(f"Error computing price trend: {e}")
+        trend = 'sideways'
+    
+    # Determine sentiment bias
+    sentiment_summary = compute_sentiment_summary(news_items)
+    pos = sentiment_summary.get('positive', 0)
+    neg = sentiment_summary.get('negative', 0)
+    neu = sentiment_summary.get('neutral', 0)
+    total = pos + neg + neu
+    
+    sentiment_bias = 'mixed'
+    if total > 0:
+        pos_ratio = pos / total
+        neg_ratio = neg / total
+        
+        if pos_ratio > 0.5:
+            sentiment_bias = 'positive'
+        elif neg_ratio > 0.5:
+            sentiment_bias = 'negative'
+        else:
+            sentiment_bias = 'mixed'
+    
+    # Build regime label and determine color
+    regime = ''
+    color = '#999'  # default gray
+    
+    if trend == 'bullish' and sentiment_bias == 'positive':
+        regime = 'Bullish + Positive'
+        color = '#28a745'  # green - strong bullish
+    elif trend == 'bullish' and sentiment_bias == 'negative':
+        regime = 'Bullish / Negative Divergence'
+        color = '#ff9800'  # orange - warning
+    elif trend == 'bullish' and sentiment_bias == 'mixed':
+        regime = 'Bullish + Mixed Sentiment'
+        color = '#ffc107'  # yellow - caution
+    
+    elif trend == 'bearish' and sentiment_bias == 'negative':
+        regime = 'Bearish + Negative'
+        color = '#dc3545'  # red - strong bearish
+    elif trend == 'bearish' and sentiment_bias == 'positive':
+        regime = 'Bearish / Positive Divergence'
+        color = '#ff9800'  # orange - opportunity
+    elif trend == 'bearish' and sentiment_bias == 'mixed':
+        regime = 'Bearish + Mixed Sentiment'
+        color = '#ffc107'  # yellow - caution
+    
+    elif trend == 'sideways' and sentiment_bias == 'positive':
+        regime = 'Consolidating, Positive Sentiment'
+        color = '#17a2b8'  # cyan - sideways bullish
+    elif trend == 'sideways' and sentiment_bias == 'negative':
+        regime = 'Consolidating, Negative Sentiment'
+        color = '#fd7e14'  # orange - sideways bearish
+    else:
+        regime = 'Sideways, Mixed Sentiment'
+        color = '#6c757d'  # gray - neutral
+    
+    return {
+        'regime': regime,
+        'trend': trend,
+        'sentiment_bias': sentiment_bias,
+        'color': color,
+        'price_change_pct': round(price_change_pct, 2)
+    }

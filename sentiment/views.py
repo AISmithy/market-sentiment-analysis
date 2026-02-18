@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment
+from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment, compute_regime
 
 
 def index(request):
@@ -54,6 +54,19 @@ def analyze(request):
         logger.warning(f"Failed to get ticker suggestions: {e}")
         ticker_suggestions = []
 
+    # Compute market regime
+    try:
+        regime_data = compute_regime(company_data, news)
+    except Exception as e:
+        logger.debug(f"Failed to compute regime: {e}")
+        regime_data = {
+            'regime': 'Unknown',
+            'trend': 'unknown',
+            'sentiment_bias': 'unknown',
+            'color': '#999',
+            'price_change_pct': 0.0
+        }
+
     # Include serialized history if available from the service
     history = None
     if isinstance(company_data, dict):
@@ -71,6 +84,7 @@ def analyze(request):
         'risk_sentiment_counts': risk_data['sentiment_counts'],
         'daily_stats': daily_stats_list,
         'ticker_suggestions': ticker_suggestions,
+        'regime': regime_data,
     }
 
     return JsonResponse(data, safe=False)
