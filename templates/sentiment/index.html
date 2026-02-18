@@ -1,52 +1,161 @@
 {% extends 'sentiment/base.html' %}
 
 {% block content %}
-  <section style="max-width:1000px; margin: 0 auto;">
-    <form id="ticker-form" style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
-      <label for="ticker" style="font-weight:600;">Ticker:</label>
-      <input id="ticker" name="ticker" value="AAPL" style="padding:6px 8px; font-size:1rem;" />
-      <button type="submit" style="padding:6px 12px;">Analyze</button>
-      <button id="raw-toggle" type="button" style="margin-left:auto; padding:6px 10px;">Toggle Raw JSON</button>
-    </form>
+  <div style="max-width:1400px; margin:0 auto; padding:16px;">
+    <!-- Header & Search -->
+    <div style="margin-bottom:20px;">
+      <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:12px;">
+        <h1 style="margin:0; font-size:2.2rem; font-weight:700; color:#1a1a1a;">StockSense</h1>
+        <span style="font-size:0.95rem; color:#666;">Market Sentiment & Risk Analytics</span>
+      </div>
+      <form id="ticker-form" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input id="ticker" name="ticker" value="AAPL" placeholder="Enter ticker symbol" style="padding:10px 12px; font-size:1rem; border:1px solid #ddd; border-radius:6px; width:120px;" />
+        <button type="submit" style="padding:10px 16px; background:#007bff; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">Analyze</button>
+        <button id="raw-toggle" type="button" style="padding:10px 12px; margin-left:auto; background:#f0f0f0; border:1px solid #ddd; border-radius:6px; cursor:pointer;">Show JSON</button>
+      </form>
+    </div>
 
-    <div id="loading" style="display:none;">Loading…</div>
+    <div id="loading" style="display:none; text-align:center; padding:40px; font-size:1.1rem; color:#666;">Loading analysis…</div>
 
-    <div id="content" style="display:none; gap:16px;">
-      <section id="company" style="background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px;">
-        <!-- company card -->
+    <div id="content" style="display:none;">
+      <!-- Company Header Card -->
+      <section id="company" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <!-- company info injected here -->
       </section>
 
-      <section id="price-chart" style="margin-top:0; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-        <h3 style="margin-top:0;">Historical Price Data (Candlestick)</h3>
-        <div id="candlestick-chart" style="width:100%; height:420px;"></div>
-      </section>
+      <!-- KPI Row: Risk Meter + Sentiment Summary -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+        <!-- Risk Gauge Card -->
+        <div id="risk-gauge" style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <h3 style="margin:0 0 12px 0; font-size:0.95rem; color:#666; text-align:center;">Sentiment-Driven Risk Meter</h3>
+          <div style="width:100%; text-align:center;">
+            <div style="width:120px; height:120px; margin:0 auto; position:relative;">
+              <svg width="120" height="120" style="transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#eee" stroke-width="8"/>
+                <circle id="risk-arc" cx="60" cy="60" r="50" fill="none" stroke="#ffc107" stroke-width="8" stroke-dasharray="0 314" stroke-linecap="round"/>
+              </svg>
+              <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+                <div id="risk-score-display" style="font-size:32px; font-weight:700; color:#333;">50</div>
+                <div style="font-size:12px; color:#999;">risk</div>
+              </div>
+            </div>
+            <div id="risk-level-badge" style="margin-top:12px; padding:6px 12px; border-radius:20px; font-weight:600; font-size:0.9rem; background:#ffc107; color:#333; display:inline-block;">Medium</div>
+          </div>
+        </div>
 
-      <section style="display:flex; gap:16px; align-items:flex-start; margin-top:16px;">
-        <div id="news" style="flex:1; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-          <h3 style="margin-top:0;">Recent News</h3>
+        <!-- Sentiment Breakdown Card -->
+        <div style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+          <h3 style="margin:0 0 12px 0; font-size:0.95rem; color:#666;">Sentiment Distribution</h3>
+          <div id="sentiment-chart" style="height:200px;"></div>
+          <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+            <div style="text-align:center; padding:8px; background:#f0f8f0; border-radius:6px;">
+              <div style="font-size:0.75rem; color:#666; margin-bottom:4px;">Positive</div>
+              <div id="risk-positive-count" style="font-size:1.5rem; font-weight:700; color:#28a745;">0</div>
+            </div>
+            <div style="text-align:center; padding:8px; background:#fff8f0; border-radius:6px;">
+              <div style="font-size:0.75rem; color:#666; margin-bottom:4px;">Neutral</div>
+              <div id="risk-neutral-count" style="font-size:1.5rem; font-weight:700; color:#ffc107;">0</div>
+            </div>
+            <div style="text-align:center; padding:8px; background:#f8f0f0; border-radius:6px;">
+              <div style="font-size:0.75rem; color:#666; margin-bottom:4px;">Negative</div>
+              <div id="risk-negative-count" style="font-size:1.5rem; font-weight:700; color:#dc3545;">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div style="display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:20px;">
+        <div style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+          <h3 style="margin:0 0 12px 0;">Historical Price & Candlestick</h3>
+          <div id="candlestick-chart" style="width:100%; height:360px;"></div>
+        </div>
+      </div>
+
+      <!-- Heatmap + Suggestions Side by Side -->
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:20px;">
+        <!-- Heatmap -->
+        <div style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="margin:0;">News Timeline Heatmap</h3>
+            <button id="clear-date-filter" style="padding:6px 12px; display:none; cursor:pointer; background:#f0f0f0; border:1px solid #ddd; border-radius:6px;">Clear Filter</button>
+          </div>
+          <div id="heatmap-container" style="display:flex; flex-wrap:wrap; gap:8px; min-height:80px;"></div>
+          <div id="heatmap-legend" style="margin-top:12px; font-size:0.85rem; display:flex; gap:16px; flex-wrap:wrap; color:#666;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <div style="width:14px; height:14px; background:#28a745; border-radius:3px;"></div>
+              <span>Positive</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <div style="width:14px; height:14px; background:#ffc107; border-radius:3px;"></div>
+              <span>Neutral/Mixed</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <div style="width:14px; height:14px; background:#dc3545; border-radius:3px;"></div>
+              <span>Negative</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Similar Tickers -->
+        <div style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+          <h3 style="margin:0 0 12px 0; font-size:1rem;">Sector Peers</h3>
+          <div id="suggestions-container" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+      </div>
+
+      <!-- News Section with Tabs -->
+      <div style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08); margin-bottom:20px;">
+        <div style="display:flex; gap:0; border-bottom:2px solid #eee; margin-bottom:12px;">
+          <button class="news-tab-btn" data-tab="recent" style="padding:10px 16px; border:none; background:none; cursor:pointer; font-weight:600; color:#007bff; border-bottom:3px solid #007bff; font-size:0.95rem;">Recent News</button>
+          <button class="news-tab-btn" data-tab="filtered" style="padding:10px 16px; border:none; background:none; cursor:pointer; font-weight:400; color:#999; font-size:0.95rem;">Filtered by Date</button>
+        </div>
+        <div style="max-height:500px; overflow-y:auto; padding:4px;">
           <div id="news-list"></div>
         </div>
+      </div>
 
-        <div id="chart-area" style="width:320px; background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-          <h3 style="margin-top:0;">Sentiment Summary</h3>
-          <div id="sentiment-chart"></div>
-        </div>
+      <!-- Similar Tickers Full Width -->
+      <section id="suggestions-section" style="background:#fff; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.08); margin-bottom:20px;">
+        <h3 style="margin:0 0 12px 0;">Similar Tickers (Same Sector)</h3>
+        <div id="suggestions-container-full" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;"></div>
       </section>
 
-      <section id="raw" style="margin-top:12px; display:none;">
-        <h4>Raw JSON</h4>
-        <pre id="raw-json" style="white-space: pre-wrap; background:#0b1220; color:#cfe9ff; padding:12px; border-radius:8px; overflow:auto; max-height:420px;"></pre>
+      <!-- Raw JSON (Hidden by default) -->
+      <section id="raw" style="display:none; margin-top:20px;">
+        <div style="background:#f5f5f5; padding:12px; border-radius:8px; margin-bottom:8px;">
+          <h4 style="margin:0;">Raw API Response (JSON)</h4>
+        </div>
+        <pre id="raw-json" style="white-space: pre-wrap; background:#0b1220; color:#00ff00; padding:16px; border-radius:8px; overflow:auto; max-height:400px; font-size:0.85rem; font-family:monospace;"></pre>
       </section>
     </div>
-  </section>
+  </div>
 
   <style>
+    body { background:#f8f9fa; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
     .badge { display:inline-block; padding:4px 8px; border-radius:999px; color:white; font-weight:600; font-size:0.9rem; }
     .badge.positive { background:#28a745; }
     .badge.negative { background:#dc3545; }
     .badge.neutral { background:#6c757d; }
-    .news-item { padding:10px 0; border-bottom:1px solid #eee; }
-    .news-item:last-child{ border-bottom:none; }
+    
+    .news-item { 
+      padding:12px;
+      border:1px solid #f0f0f0;
+      border-radius:8px;
+      margin-bottom:10px;
+      background:#fafafa;
+      transition:all 0.2s;
+    }
+    .news-item:hover {
+      background:#fff;
+      border-color:#ddd;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+    }
+    .news-item:last-child { margin-bottom:0; }
+    
+    .news-tab-btn { transition:all 0.2s; }
+    .news-tab-btn:hover { color:#0056b3 !important; }
+    .news-tab-btn.active { color:#007bff; border-bottom-color:#007bff; }
   </style>
 
   <script>
@@ -82,6 +191,347 @@
 
     function formatMarketCap(m){ return m ?? 'N/A'; }
 
+    function updateRiskGauge(riskScore, riskLevel, sentimentCounts) {
+      /* Update the risk gauge display and colors based on score */
+      const score = riskScore || 50;
+      const level = riskLevel || 'medium';
+
+      // Update the score display
+      document.getElementById('risk-score-display').textContent = Math.round(score);
+
+      // Update the arc (circumference = 2πr = 314 for r=50)
+      const circumference = 314;
+      const percentage = score / 100;
+      const dasharray = circumference * percentage;
+      const arc = document.getElementById('risk-arc');
+      arc.setAttribute('stroke-dasharray', `${dasharray} ${circumference}`);
+
+      // Update color based on risk level
+      let color = '#ffc107'; // medium - orange
+      if (level === 'low') {
+        color = '#28a745'; // green
+      } else if (level === 'high') {
+        color = '#dc3545'; // red
+      }
+      arc.setAttribute('stroke', color);
+
+      // Update badge
+      const badge = document.getElementById('risk-level-badge');
+      badge.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+      badge.style.background = color;
+      badge.style.color = level === 'low' || level === 'high' ? '#fff' : '#333';
+
+      // Update sentiment counts
+      if (sentimentCounts) {
+        document.getElementById('risk-positive-count').textContent = sentimentCounts.positive || 0;
+        document.getElementById('risk-neutral-count').textContent = sentimentCounts.neutral || 0;
+        document.getElementById('risk-negative-count').textContent = sentimentCounts.negative || 0;
+      }
+    }
+
+    function getHeatmapColor(dominantSentiment, netSentiment) {
+      /* Determine heatmap cell color based on sentiment */
+      if (dominantSentiment === 'Positive') {
+        return '#28a745'; // green
+      } else if (dominantSentiment === 'Negative') {
+        return '#dc3545'; // red
+      } else {
+        return '#ffc107'; // yellow/neutral
+      }
+    }
+
+    function renderHeatmap(dailyStats) {
+      /* Render the daily sentiment heatmap */
+      const container = document.getElementById('heatmap-container');
+      container.innerHTML = '';
+
+      if (!dailyStats || dailyStats.length === 0) {
+        container.innerHTML = '<div style="color:#999;">No daily data available</div>';
+        return;
+      }
+
+      // Sort by date descending (newest first)
+      const sorted = [...dailyStats].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      sorted.forEach(day => {
+        const color = getHeatmapColor(day.dominant_sentiment, day.net_sentiment);
+        const cellDiv = document.createElement('div');
+        cellDiv.className = 'heatmap-cell';
+        cellDiv.dataset.date = day.date;
+        cellDiv.style.cssText = `
+          width: 60px;
+          height: 60px;
+          background: ${color};
+          border: 2px solid #ddd;
+          border-radius: 6px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+          padding: 4px;
+          text-align: center;
+          font-size: 0.75rem;
+          color: white;
+          font-weight: 600;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        `;
+
+        // Add hover effect
+        cellDiv.onmouseover = function() {
+          this.style.transform = 'scale(1.1)';
+          this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+        };
+        cellDiv.onmouseout = function() {
+          this.style.transform = 'scale(1)';
+          this.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+        };
+
+        // Format date
+        const dateObj = new Date(day.date);
+        const monthDay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        // Create content
+        const dateEl = document.createElement('div');
+        dateEl.textContent = monthDay;
+        dateEl.style.fontSize = '0.75rem';
+        dateEl.style.fontWeight = '700';
+
+        const countEl = document.createElement('div');
+        countEl.textContent = `${day.count} article${day.count !== 1 ? 's' : ''}`;
+        countEl.style.fontSize = '0.65rem';
+        countEl.style.marginTop = '2px';
+        countEl.style.fontWeight = '500';
+
+        cellDiv.appendChild(dateEl);
+        cellDiv.appendChild(countEl);
+
+        // Add click handler for filtering
+        cellDiv.onclick = function() {
+          filterNewsByDate(day.date, cellDiv);
+        };
+
+        container.appendChild(cellDiv);
+
+        // Add title tooltip
+        const tooltip = `${day.dominant_sentiment} | ${day.positive} pos, ${day.negative} neg, ${day.neutral} neu`;
+        cellDiv.title = tooltip;
+      });
+    }
+
+    let currentDateFilter = null;
+
+    function filterNewsByDate(date, cellEl) {
+      /* Filter news list to show only articles from the selected date */
+      const clearBtn = document.getElementById('clear-date-filter');
+      const newsList = document.getElementById('news-list');
+
+      // Toggle: clicking the same date clears the filter
+      if (currentDateFilter === date) {
+        currentDateFilter = null;
+        clearBtn.style.display = 'none';
+        displayNewsList(window.allNewsData);
+        // Reset heatmap cell styling
+        document.querySelectorAll('.heatmap-cell').forEach(c => c.style.opacity = '1');
+        return;
+      }
+
+      currentDateFilter = date;
+      clearBtn.style.display = 'block';
+
+      // Filter news to this date
+      const filtered = window.allNewsData.filter(item => {
+        const itemDate = item.published ? item.published.split(' ').slice(1).join(' ').match(/\d{1,2}\s\w+\s\d{4}/)?.[0] : '';
+        const dateObj = new Date(date);
+        const cellDate = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        return itemDate.includes(dateObj.getDate()) && itemDate.includes(dateObj.toLocaleDateString('en-US', { month: 'short' })) && itemDate.includes(dateObj.getFullYear());
+      });
+
+      // Simpler approach: parse dates from the daily_stats
+      const filtered2 = window.allNewsData.filter(item => {
+        try {
+          const published = item.published || '';
+          let itemDate = '';
+          // Try to extract date
+          for (const fmt of ['%a, %d %b %Y', '%Y-%m-%d']) {
+            const match = published.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+              itemDate = match[0];
+              break;
+            }
+            // Also try "DD Mon YYYY"
+            const match2 = published.match(/(\d{1,2})\s(\w+)\s(\d{4})/);
+            if (match2) {
+              const d = parseInt(match2[1]);
+              const m = new Date(match2[3], 0, 1);
+              m.setMonth(['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(match2[2]));
+              itemDate = m.toISOString().split('T')[0];
+              break;
+            }
+          }
+          return itemDate === date;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      displayNewsList(filtered2);
+
+      // Highlight the selected cell
+      document.querySelectorAll('.heatmap-cell').forEach(c => {
+        c.style.opacity = c.dataset.date === date ? '1' : '0.5';
+      });
+    }
+
+    function displayNewsList(newsArray) {
+      /* Display news items in the news list */
+      const newsList = document.getElementById('news-list');
+
+      if (newsArray.length === 0) {
+        newsList.innerHTML = '<div style="color:#999; padding:20px; text-align:center;">No articles available.</div>';
+        return;
+      }
+
+      newsList.innerHTML = '';
+      newsArray.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'news-item';
+
+        const titleEl = document.createElement('div');
+        titleEl.style.cssText = 'margin-bottom:6px;';
+        const a = document.createElement('a');
+        a.href = item.link || '#';
+        a.textContent = item.title || 'No title';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.cssText = 'color:#007bff; text-decoration:none; font-weight:500; font-size:0.95rem;';
+        titleEl.appendChild(a);
+
+        const metaRow = document.createElement('div');
+        metaRow.style.cssText = 'display:flex; gap:8px; align-items:center; margin-top:6px;';
+        const badge = sentimentBadge(item.sentiment_label);
+        badge.style.padding = '3px 8px';
+        badge.style.fontSize = '0.85rem';
+        metaRow.appendChild(badge);
+
+        if (item.sentiment_score != null) {
+          const scoreEl = document.createElement('span');
+          scoreEl.style.cssText = 'color:#666; font-size:0.85rem;';
+          scoreEl.textContent = `Confidence: ${(item.sentiment_score * 100).toFixed(0)}%`;
+          metaRow.appendChild(scoreEl);
+        }
+
+        const pubEl = document.createElement('div');
+        pubEl.style.cssText = 'font-size:0.8rem; color:#999; margin-top:4px;';
+        pubEl.textContent = item.published || 'Unknown date';
+
+        div.appendChild(titleEl);
+        div.appendChild(metaRow);
+        div.appendChild(pubEl);
+        newsList.appendChild(div);
+      });
+    }
+
+    function renderTickerSuggestions(suggestions) {
+      /* Render ticker suggestion cards in both locations */
+      const container = document.getElementById('suggestions-container-full');
+      
+      if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<div style="color:#999; grid-column:1/-1; text-align:center; padding:20px;">No similar tickers found.</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      
+      suggestions.forEach(suggestion => {
+        const ticker = suggestion.ticker;
+        const sent = suggestion.sentiment;
+        
+        // Determine dominant sentiment
+        let sentimentColor = '#ffc107';
+        let sentimentLabel = 'Neutral';
+        let textColor = '#333';
+        if (sent.positive > sent.negative && sent.positive > sent.neutral) {
+          sentimentColor = '#28a745';
+          sentimentLabel = 'Positive';
+          textColor = '#fff';
+        } else if (sent.negative > sent.positive && sent.negative > sent.neutral) {
+          sentimentColor = '#dc3545';
+          sentimentLabel = 'Negative';
+          textColor = '#fff';
+        } else {
+          textColor = '#333';
+        }
+        
+        const card = document.createElement('div');
+        card.style.cssText = `
+          padding: 14px;
+          border: 2px solid ${sentimentColor};
+          border-radius: 10px;
+          background: ${sentimentColor}14;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+        `;
+        
+        card.onmouseover = function() {
+          this.style.transform = 'translateY(-4px)';
+          this.style.boxShadow = `0 6px 16px ${sentimentColor}40`;
+          this.style.borderColor = sentimentColor;
+        };
+        card.onmouseout = function() {
+          this.style.transform = 'translateY(0)';
+          this.style.boxShadow = 'none';
+        };
+        
+        card.onclick = function() {
+          document.getElementById('ticker').value = ticker;
+          document.getElementById('ticker-form').dispatchEvent(new Event('submit'));
+        };
+        
+        const tickerEl = document.createElement('div');
+        tickerEl.style.cssText = `
+          font-size: 1.4rem;
+          font-weight: 700;
+          color: #000;
+          margin-bottom: 8px;
+          letter-spacing: 0.5px;
+        `;
+        tickerEl.textContent = ticker;
+        
+        const sentBadge = document.createElement('div');
+        sentBadge.style.cssText = `
+          display: inline-block;
+          padding: 5px 10px;
+          border-radius: 20px;
+          background: ${sentimentColor};
+          color: ${textColor};
+          font-size: 0.8rem;
+          font-weight: 600;
+          margin-bottom: 10px;
+        `;
+        sentBadge.textContent = sentimentLabel;
+        
+        const statsEl = document.createElement('div');
+        statsEl.style.cssText = `
+          font-size: 0.8rem;
+          color: #666;
+          line-height: 1.6;
+        `;
+        statsEl.innerHTML = `
+          <div style="margin: 2px 0;"><span style="color:#28a745; font-weight:600;">+${sent.positive}</span> | <span style="color:#ffc107; font-weight:600;">●${sent.neutral}</span> | <span style="color:#dc3545; font-weight:600;">−${sent.negative}</span></div>
+          <div style="margin-top: 4px; font-size: 0.75rem; color: #999;">${sent.count} articles</div>
+        `;
+        
+        card.appendChild(tickerEl);
+        card.appendChild(sentBadge);
+        card.appendChild(statsEl);
+        
+        container.appendChild(card);
+      });
+    }
+
     function sentimentBadge(label){
       const l = (label || '').toLowerCase();
       const span = document.createElement('span');
@@ -104,82 +554,69 @@
         if(!res.ok) throw new Error('Server returned ' + res.status);
         const data = await res.json();
 
-        // Company card
+        // Company card (styled header)
         const c = data.company || {};
-  const title = document.createElement('div');
-  title.innerHTML = `<h2 style="margin:0 0 6px 0;">${data.ticker} — ${c.name ?? 'Unknown Company'}</h2>`;
-  // last-updated element
-  lastUpdatedEl = document.createElement('div');
-  lastUpdatedEl.style.fontSize = '0.85rem';
-  lastUpdatedEl.style.color = '#666';
-  lastUpdatedEl.style.marginTop = '6px';
-  lastUpdatedEl.textContent = '';
+        const title = document.createElement('div');
+        title.innerHTML = `<h2 style="margin:0 0 8px 0; font-size:1.8rem; font-weight:700;">${data.ticker}</h2>
+          <p style="margin:0 0 12px 0; font-size:1.1rem; opacity:0.9;">${c.name ?? 'Unknown Company'}</p>`;
+        
+        // last-updated element
+        lastUpdatedEl = document.createElement('div');
+        lastUpdatedEl.style.cssText = 'font-size:0.8rem; color:rgba(255,255,255,0.8); margin-top:8px;';
+        lastUpdatedEl.textContent = '';
+        
         const meta = document.createElement('div');
-        meta.style.color = '#555';
-        // Price and delta — create dedicated elements so polling updates don't duplicate content
-        let currentPriceHtml = 'N/A';
+        meta.style.cssText = 'display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.2);';
+        
+        // Price card
+        let priceHtml = 'N/A';
         let deltaHtml = '';
         if(c.current_price != null){
-          currentPriceHtml = `<span id="current-price">$${c.current_price.toFixed(2)}</span>`;
+          priceHtml = `<div style="font-size:0.85rem; opacity:0.9; margin-bottom:4px;">Current Price</div>
+            <div id="current-price" style="font-size:1.6rem; font-weight:700;">$${c.current_price.toFixed(2)}</div>`;
           if(c.change != null){
             const up = c.change > 0;
-            const arrow = up ? '▲' : (c.change < 0 ? '▼' : '');
-            const color = up ? 'green' : (c.change < 0 ? 'red' : '#666');
-            deltaHtml = `<span id="current-delta" style="color:${color}; font-weight:700;"> ${arrow} ${Math.abs(c.change).toFixed(2)} ${c.change_pct!=null? '('+c.change_pct.toFixed(2)+'% )':''}</span>`;
+            const arrow = up ? '▲' : (c.change < 0 ? '▼' : '—');
+            const color = up ? '#4caf50' : (c.change < 0 ? '#f44336' : '#999');
+            deltaHtml = `<div id="current-delta" style="color:${color}; font-weight:600; margin-top:4px; font-size:0.9rem;"> ${arrow} ${Math.abs(c.change).toFixed(2)} ${c.change_pct!=null? '('+c.change_pct.toFixed(2)+'%)':''}</div>`;
           } else {
-            deltaHtml = `<span id="current-delta"></span>`;
+            deltaHtml = `<div id="current-delta"></div>`;
           }
         } else {
-          // ensure elements exist even when price is N/A so polling has targets
-          currentPriceHtml = `<span id="current-price">N/A</span>`;
-          deltaHtml = `<span id="current-delta"></span>`;
+          priceHtml = '<div style="font-size:0.85rem; opacity:0.9; margin-bottom:4px;">Current Price</div><div id="current-price" style="font-size:1.4rem; font-weight:700;">N/A</div>';
+          deltaHtml = `<div id="current-delta"></div>`;
         }
-
-        meta.innerHTML = `<strong>Sector:</strong> ${c.sector ?? 'N/A'} &nbsp; • &nbsp; <strong>Market cap:</strong> ${formatMarketCap(c.market_cap)} &nbsp; • &nbsp; <strong>Current:</strong> ${currentPriceHtml} ${deltaHtml}`;
+        meta.innerHTML = `
+          <div>${priceHtml}${deltaHtml}</div>
+          <div>
+            <div style="font-size:0.85rem; opacity:0.9; margin-bottom:4px;">Sector</div>
+            <div style="font-size:1rem; font-weight:600;">${c.sector ?? 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size:0.85rem; opacity:0.9; margin-bottom:4px;">Market Cap</div>
+            <div style="font-size:1rem; font-weight:600;">${formatMarketCap(c.market_cap)}</div>
+          </div>
+        `;
+        
         const summary = document.createElement('p');
-        summary.style.marginTop = '8px';
+        summary.style.cssText = 'margin:12px 0 0 0; font-size:0.95rem; opacity:0.95; line-height:1.5;';
         summary.textContent = c.business_summary ?? '';
+        
         companyEl.appendChild(title);
-  companyEl.appendChild(lastUpdatedEl);
         companyEl.appendChild(meta);
         companyEl.appendChild(summary);
+        companyEl.appendChild(lastUpdatedEl);
 
         // News list
         const news = data.news || [];
+        window.allNewsData = news;  // Store globally for filtering
+        currentDateFilter = null;  // Reset filter
+        document.getElementById('clear-date-filter').style.display = 'none';
+
         if(news.length === 0){
           newsList.innerHTML = '<div>No recent news or sentiment analysis unavailable.</div>';
         } else {
-          news.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'news-item';
-
-            const h = document.createElement('div');
-            const a = document.createElement('a');
-            a.href = item.link || '#';
-            a.textContent = item.title || 'No title';
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            h.appendChild(a);
-
-            const meta2 = document.createElement('div');
-            meta2.style.marginTop = '6px';
-            meta2.style.color = '#666';
-            const badge = sentimentBadge(item.sentiment_label);
-            meta2.appendChild(badge);
-            const score = document.createElement('span');
-            score.style.marginLeft = '8px';
-            score.textContent = item.sentiment_score != null ? `(${item.sentiment_score.toFixed(2)})` : '';
-            meta2.appendChild(score);
-            const pub = document.createElement('div');
-            pub.style.fontSize = '0.9rem';
-            pub.style.color = '#888';
-            pub.textContent = item.published || '';
-
-            div.appendChild(h);
-            div.appendChild(meta2);
-            div.appendChild(pub);
-            newsList.appendChild(div);
-          });
+          displayNewsList(news);
         }
 
         // Sentiment summary chart
@@ -211,6 +648,17 @@
 
         // Raw JSON
         rawJson.textContent = JSON.stringify(data, null, 2);
+
+        // Update risk gauge
+        updateRiskGauge(data.risk_score, data.risk_level, data.risk_sentiment_counts);
+
+        // Render heatmap
+        const dailyStats = data.daily_stats || [];
+        renderHeatmap(dailyStats);
+
+        // Render ticker suggestions
+        const suggestions = data.ticker_suggestions || [];
+        renderTickerSuggestions(suggestions);
 
         // Candlestick chart
         try{
@@ -277,6 +725,12 @@
             deltaEl.textContent = '';
           }
         }
+
+        // Update risk gauge with new data
+        if(p.risk_score != null){
+          updateRiskGauge(p.risk_score, p.risk_level, p.risk_sentiment_counts);
+        }
+
         if(lastUpdatedEl){ lastUpdatedEl.textContent = 'Last updated: ' + new Date().toLocaleString(); }
       }catch(e){
         console.warn('Price poll failed', e);
@@ -285,5 +739,46 @@
 
     // start polling interval
     setInterval(pollPrice, 30000);
+
+    // Add clear filter button handler
+    document.getElementById('clear-date-filter').addEventListener('click', () => {
+      currentDateFilter = null;
+      document.getElementById('clear-date-filter').style.display = 'none';
+      displayNewsList(window.allNewsData);
+      document.querySelectorAll('.heatmap-cell').forEach(c => c.style.opacity = '1');
+    });
+
+    // News tab switching
+    let currentTab = 'recent';  // Track active tab
+    document.querySelectorAll('.news-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tab = e.target.getAttribute('data-tab');
+        if(tab === currentTab) return;  // Already on this tab
+        
+        // Update button styles
+        document.querySelectorAll('.news-tab-btn').forEach(b => {
+          b.style.color = '#999';
+          b.style.fontWeight = '400';
+          b.style.borderBottom = 'none';
+        });
+        e.target.style.color = '#007bff';
+        e.target.style.fontWeight = '600';
+        e.target.style.borderBottom = '3px solid #007bff';
+        
+        currentTab = tab;
+        
+        if(tab === 'recent'){
+          // Show all news
+          displayNewsList(window.allNewsData);
+        } else if(tab === 'filtered' && currentDateFilter){
+          // Show filtered news (by date)
+          const filtered = window.allNewsData.filter(n => n.published && n.published.startsWith(currentDateFilter));
+          displayNewsList(filtered);
+        } else {
+          // No filter set, show all
+          displayNewsList(window.allNewsData);
+        }
+      });
+    });
   </script>
 {% endblock %}

@@ -96,3 +96,273 @@ def analyze_news_for_ticker(ticker):
     except Exception as e:
         logger.exception('Error analyzing news')
         return []
+
+
+def compute_risk_score(news_items):
+    """
+    Compute a short-term risk score (0-100) based on recent news sentiment.
+    
+    Risk scoring logic:
+    - Negative sentiment: increases risk
+    - Neutral sentiment: neutral risk
+    - Positive sentiment: decreases risk
+    
+    Returns a dict with:
+    - risk_score: 0-100 (0=low risk, 100=high risk)
+    - risk_level: 'low', 'medium', 'high'
+    - sentiment_counts: dict with counts by sentiment
+    """
+    if not news_items:
+        # No news = moderate risk (unknown)
+        return {
+            'risk_score': 50,
+            'risk_level': 'medium',
+            'sentiment_counts': {'positive': 0, 'negative': 0, 'neutral': 0}
+        }
+    
+    positive_count = 0
+    negative_count = 0
+    neutral_count = 0
+    weighted_score = 0.0
+    
+    for item in news_items:
+        label = (item.get('sentiment_label') or 'Neutral').lower()
+        score = item.get('sentiment_score') or 0.0
+        
+        if label.startswith('posit'):
+            positive_count += 1
+            # Positive sentiment reduces risk: lower contribution
+            weighted_score -= score * 25  # Positive contributions reduce the base
+        elif label.startswith('neg'):
+            negative_count += 1
+            # Negative sentiment increases risk: higher contribution
+            weighted_score += score * 50  # Negative contributions increase risk more
+        else:
+            neutral_count += 1
+            # Neutral sentiment has minimal impact
+            weighted_score += score * 5
+    
+    # Normalize: base risk is 50, then adjust based on sentiment distribution
+    base_risk = 50
+    
+    # Calculate average sentiment impact
+    total_items = len(news_items)
+    positive_ratio = positive_count / total_items if total_items > 0 else 0
+    negative_ratio = negative_count / total_items if total_items > 0 else 0
+    
+    # Adjust risk based on sentiment ratios
+    risk_adjustment = (negative_ratio * 40) - (positive_ratio * 25)
+    risk_score = base_risk + risk_adjustment + (weighted_score / max(total_items, 1))
+    
+    # Clamp to 0-100
+    risk_score = max(0, min(100, risk_score))
+    
+    # Determine risk level
+    if risk_score < 33:
+        risk_level = 'low'
+    elif risk_score < 67:
+        risk_level = 'medium'
+    else:
+        risk_level = 'high'
+    
+    return {
+        'risk_score': round(risk_score, 1),
+        'risk_level': risk_level,
+        'sentiment_counts': {
+            'positive': positive_count,
+            'negative': negative_count,
+            'neutral': neutral_count
+        }
+    }
+
+
+def compute_daily_sentiment_stats(news_items):
+    """
+    Group news items by day and compute daily sentiment statistics.
+    
+    Returns a dict mapping date (YYYY-MM-DD) to:
+    - date: the date string
+    - count: number of articles
+    - positive: count of positive articles
+    - negative: count of negative articles
+    - neutral: count of neutral articles
+    - avg_score: average sentiment score
+    - dominant_sentiment: 'Positive', 'Negative', or 'Neutral'
+    - net_sentiment: calculated sentiment bias (-1 to 1)
+    """
+    from datetime import datetime
+    
+    daily_stats = {}
+    
+    for item in news_items:
+        # Parse the published date (format: "Day, dd Mon YYYY hh:mm:ss GMT" or similar)
+        published_str = item.get('published') or ''
+        try:
+            # Try multiple date formats
+            date_obj = None
+            for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S', '%Y-%m-%d']:
+                try:
+                    date_obj = datetime.strptime(published_str.replace('GMT', '').strip(), fmt)
+                    break
+                except ValueError:
+                    continue
+            
+            if date_obj is None:
+                # If parsing fails, try ISO format or skip
+                try:
+                    date_obj = datetime.fromisoformat(published_str.split('T')[0])
+                except:
+                    continue
+            
+            date_key = date_obj.strftime('%Y-%m-%d')
+        except:
+            continue
+        
+        if date_key not in daily_stats:
+            daily_stats[date_key] = {
+                'date': date_key,
+                'count': 0,
+                'positive': 0,
+                'negative': 0,
+                'neutral': 0,
+                'total_score': 0.0,
+            }
+        
+        stats = daily_stats[date_key]
+        stats['count'] += 1
+        
+        label = (item.get('sentiment_label') or 'Neutral').lower()
+        score = item.get('sentiment_score') or 0.0
+        stats['total_score'] += score
+        
+        if label.startswith('posit'):
+            stats['positive'] += 1
+        elif label.startswith('neg'):
+            stats['negative'] += 1
+        else:
+            stats['neutral'] += 1
+    
+    # Compute derived metrics
+    for date_key, stats in daily_stats.items():
+        count = stats['count']
+        stats['avg_score'] = round(stats['total_score'] / count, 3) if count > 0 else 0.0
+        
+        # Determine dominant sentiment
+        pos, neg, neu = stats['positive'], stats['negative'], stats['neutral']
+        if pos > neg and pos > neu:
+            stats['dominant_sentiment'] = 'Positive'
+        elif neg > pos and neg > neu:
+            stats['dominant_sentiment'] = 'Negative'
+        else:
+            stats['dominant_sentiment'] = 'Neutral'
+        
+        # Net sentiment: -1 (all negative) to 1 (all positive)
+        net = (pos - neg) / max(count, 1)
+        stats['net_sentiment'] = round(net, 3)
+        
+        # Remove the temporary total_score field
+        del stats['total_score']
+    
+    return daily_stats
+
+def get_related_tickers(ticker):
+    """
+    Get a list of related tickers based on industry/sector grouping.
+    Returns 3-5 related tickers excluding the input ticker.
+    """
+    # Define ticker groups by category (tech, AI, finance, consumer, etc.)
+    ticker_groups = {
+        'mega_tech': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA'],
+        'ai_ml': ['NVDA', 'MSFT', 'GOOGL', 'AMD', 'LRCX', 'ASML', 'BROADCOM'],
+        'cloud': ['MSFT', 'GOOGL', 'AMZN', 'CRM', 'ADBE', 'OKTA', 'MDB'],
+        'semiconductors': ['NVDA', 'AMD', 'QUALCOMM', 'INTC', 'LRCX', 'ASML', 'BROADCOM'],
+        'finance': ['JPM', 'BAC', 'WFC', 'GS', 'MS', 'AMEX', 'SCHW'],
+        'consumer': ['AMZN', 'TSLA', 'AAPL', 'META', 'WMT', 'TGT', 'COST'],
+        'energy': ['XOM', 'CVX', 'MPC', 'COP', 'EOG', 'FANG', 'OXY'],
+        'pharma': ['JNJ', 'PFE', 'MRNA', 'ABBV', 'VRTX', 'BNTX', 'AMGN'],
+    }
+    
+    ticker_upper = ticker.upper()
+    related = []
+    
+    # Find which groups contain this ticker
+    for group_name, tickers in ticker_groups.items():
+        if ticker_upper in tickers:
+            # Get up to 4 other tickers from this group
+            other_tickers = [t for t in tickers if t != ticker_upper]
+            related.extend(other_tickers[:4])
+            break
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_related = []
+    for t in related:
+        if t not in seen:
+            seen.add(t)
+            unique_related.append(t)
+    
+    # Return up to 5 suggestions
+    return unique_related[:5]
+
+
+def compute_sentiment_summary(news_items):
+    """
+    Compute a summary of sentiment for a list of news items.
+    Returns: {positive: count, negative: count, neutral: count, avg_score: float}
+    """
+    if not news_items:
+        return {'positive': 0, 'negative': 0, 'neutral': 0, 'avg_score': 0.0}
+    
+    positive = negative = neutral = 0
+    total_score = 0.0
+    
+    for item in news_items:
+        label = (item.get('sentiment_label') or 'Neutral').lower()
+        score = item.get('sentiment_score') or 0.0
+        total_score += score
+        
+        if label.startswith('posit'):
+            positive += 1
+        elif label.startswith('neg'):
+            negative += 1
+        else:
+            neutral += 1
+    
+    return {
+        'positive': positive,
+        'negative': negative,
+        'neutral': neutral,
+        'avg_score': round(total_score / len(news_items), 3) if news_items else 0.0
+    }
+
+
+def get_ticker_suggestions_with_sentiment(ticker):
+    """
+    Get related tickers with their current sentiment profiles.
+    This is cached at the HTTP level to avoid expensive repeated analysis.
+    
+    Returns a list of dicts with:
+    - ticker: the ticker symbol
+    - sentiment: sentiment summary {positive, negative, neutral, avg_score}
+    - count: number of articles analyzed
+    """
+    related_tickers = get_related_tickers(ticker)
+    suggestions = []
+    
+    for suggested_ticker in related_tickers:
+        try:
+            # Get news and compute sentiment for this ticker
+            news = data_ingestion.get_stock_news(suggested_ticker)
+            if news:
+                sentiment = compute_sentiment_summary(news)
+                sentiment['count'] = len(news)
+                suggestions.append({
+                    'ticker': suggested_ticker,
+                    'sentiment': sentiment,
+                })
+        except Exception as e:
+            # Skip tickers that fail to fetch
+            logger.debug(f"Failed to get news for {suggested_ticker}: {e}")
+            continue
+    
+    return suggestions

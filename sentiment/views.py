@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from .services import get_company_data, analyze_news_for_ticker
+from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment
 
 
 def index(request):
@@ -39,6 +39,21 @@ def analyze(request):
 
     news = analyze_news_for_ticker(ticker)
 
+    # Compute risk score based on sentiment
+    risk_data = compute_risk_score(news)
+
+    # Compute daily sentiment statistics
+    daily_stats = compute_daily_sentiment_stats(news)
+    # Convert to sorted list by date (newest first)
+    daily_stats_list = sorted(daily_stats.values(), key=lambda x: x['date'], reverse=True)
+
+    # Get ticker suggestions with sentiment
+    try:
+        ticker_suggestions = get_ticker_suggestions_with_sentiment(ticker)
+    except Exception as e:
+        logger.warning(f"Failed to get ticker suggestions: {e}")
+        ticker_suggestions = []
+
     # Include serialized history if available from the service
     history = None
     if isinstance(company_data, dict):
@@ -51,13 +66,18 @@ def analyze(request):
         'news_available': bool(news),
         'history': history,
         'history_available': bool(history),
+        'risk_score': risk_data['risk_score'],
+        'risk_level': risk_data['risk_level'],
+        'risk_sentiment_counts': risk_data['sentiment_counts'],
+        'daily_stats': daily_stats_list,
+        'ticker_suggestions': ticker_suggestions,
     }
 
     return JsonResponse(data, safe=False)
 
 
 def price(request):
-    """Lightweight endpoint that returns only the price/change info for a ticker."""
+    """Lightweight endpoint that returns only the price/change info and risk score for a ticker."""
     ticker = request.GET.get('ticker', 'AAPL').upper()
     company_data = get_company_data(ticker)
     price_info = None
@@ -66,11 +86,19 @@ def price(request):
     else:
         price_info = {}
 
+    # Include risk score (requires fetching news)
+    news = analyze_news_for_ticker(ticker)
+    risk_data = compute_risk_score(news)
+
     data = {
         'ticker': ticker,
         'current_price': price_info.get('current_price'),
         'previous_close': price_info.get('previous_close'),
         'change': price_info.get('change'),
         'change_pct': price_info.get('change_pct'),
+        'risk_score': risk_data['risk_score'],
+        'risk_level': risk_data['risk_level'],
+        'risk_sentiment_counts': risk_data['sentiment_counts'],
     }
     return JsonResponse(data)
+
