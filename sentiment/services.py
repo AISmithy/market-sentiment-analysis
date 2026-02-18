@@ -429,37 +429,37 @@ def compute_regime(company_data, news_items):
     
     # Build regime label and determine color
     regime = ''
-    color = '#999'  # default gray
+    color = '#9ca3af'  # default gray
     
     if trend == 'bullish' and sentiment_bias == 'positive':
         regime = 'Bullish + Positive'
-        color = '#28a745'  # green - strong bullish
+        color = '#10b981'  # vibrant green - strong bullish
     elif trend == 'bullish' and sentiment_bias == 'negative':
         regime = 'Bullish / Negative Divergence'
-        color = '#ff9800'  # orange - warning
+        color = '#f97316'  # vibrant orange - warning
     elif trend == 'bullish' and sentiment_bias == 'mixed':
         regime = 'Bullish + Mixed Sentiment'
-        color = '#ffc107'  # yellow - caution
+        color = '#f59e0b'  # vibrant amber - caution
     
     elif trend == 'bearish' and sentiment_bias == 'negative':
         regime = 'Bearish + Negative'
-        color = '#dc3545'  # red - strong bearish
+        color = '#ef4444'  # vibrant red - strong bearish
     elif trend == 'bearish' and sentiment_bias == 'positive':
         regime = 'Bearish / Positive Divergence'
-        color = '#ff9800'  # orange - opportunity
+        color = '#f97316'  # vibrant orange - opportunity
     elif trend == 'bearish' and sentiment_bias == 'mixed':
         regime = 'Bearish + Mixed Sentiment'
-        color = '#ffc107'  # yellow - caution
+        color = '#f59e0b'  # vibrant amber - caution
     
     elif trend == 'sideways' and sentiment_bias == 'positive':
         regime = 'Consolidating, Positive Sentiment'
-        color = '#17a2b8'  # cyan - sideways bullish
+        color = '#06b6d4'  # vibrant cyan - sideways bullish
     elif trend == 'sideways' and sentiment_bias == 'negative':
         regime = 'Consolidating, Negative Sentiment'
-        color = '#fd7e14'  # orange - sideways bearish
+        color = '#f97316'  # vibrant orange - sideways bearish
     else:
         regime = 'Sideways, Mixed Sentiment'
-        color = '#6c757d'  # gray - neutral
+        color = '#6b7280'  # medium gray - neutral
     
     return {
         'regime': regime,
