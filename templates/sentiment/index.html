@@ -557,6 +557,18 @@
       return span;
     }
 
+    function resizePlot(plotId) {
+      const el = document.getElementById(plotId);
+      if (window.Plotly && el) {
+        Plotly.Plots.resize(el);
+      }
+    }
+
+    function resizeAllPlots() {
+      resizePlot('sentiment-chart');
+      resizePlot('candlestick-chart');
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const ticker = document.getElementById('ticker').value.trim();
@@ -706,6 +718,7 @@
         content.style.display = 'flex';
         content.style.flexDirection = 'column';
         loading.style.display = 'none';
+        requestAnimationFrame(() => resizeAllPlots());
         // update last-updated timestamp
         if(lastUpdatedEl){
           lastUpdatedEl.textContent = 'Last updated: ' + new Date().toLocaleString();
@@ -761,6 +774,12 @@
 
     // start polling interval
     setInterval(pollPrice, 30000);
+
+    window.addEventListener('resize', () => {
+      if (content.style.display !== 'none') {
+        resizeAllPlots();
+      }
+    });
 
     // Add clear filter button handler
     document.getElementById('clear-date-filter').addEventListener('click', () => {
