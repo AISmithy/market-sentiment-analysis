@@ -114,10 +114,22 @@ def compute_risk_score(news_items):
     """
     if not news_items:
         # No news = moderate risk (unknown)
+        risk_score = 50.0
+        risk_level = 'medium'
+        sentiment_counts = {'positive': 0, 'negative': 0, 'neutral': 0}
         return {
-            'risk_score': 50,
-            'risk_level': 'medium',
-            'sentiment_counts': {'positive': 0, 'negative': 0, 'neutral': 0}
+            'risk_score': risk_score,
+            'risk_level': risk_level,
+            'sentiment_counts': sentiment_counts,
+            'risk_explanation': explain_risk_meter(
+                risk_score=risk_score,
+                risk_level=risk_level,
+                sentiment_counts=sentiment_counts,
+                total_items=0,
+                base_risk=50.0,
+                ratio_adjustment=0.0,
+                confidence_adjustment=0.0,
+            ),
         }
     
     positive_count = 0
@@ -165,14 +177,77 @@ def compute_risk_score(news_items):
     else:
         risk_level = 'high'
     
+    sentiment_counts = {
+        'positive': positive_count,
+        'negative': negative_count,
+        'neutral': neutral_count
+    }
+    rounded_score = round(risk_score, 1)
+    confidence_adjustment = weighted_score / max(total_items, 1)
+
     return {
-        'risk_score': round(risk_score, 1),
+        'risk_score': rounded_score,
         'risk_level': risk_level,
-        'sentiment_counts': {
-            'positive': positive_count,
-            'negative': negative_count,
-            'neutral': neutral_count
+        'sentiment_counts': sentiment_counts,
+        'risk_explanation': explain_risk_meter(
+            risk_score=rounded_score,
+            risk_level=risk_level,
+            sentiment_counts=sentiment_counts,
+            total_items=total_items,
+            base_risk=base_risk,
+            ratio_adjustment=risk_adjustment,
+            confidence_adjustment=confidence_adjustment,
+        ),
+    }
+
+
+def explain_risk_meter(
+    risk_score,
+    risk_level,
+    sentiment_counts,
+    total_items,
+    base_risk,
+    ratio_adjustment,
+    confidence_adjustment,
+):
+    """
+    Build a human-readable explanation of how the risk score was determined.
+    """
+    positive = int(sentiment_counts.get('positive', 0) or 0)
+    negative = int(sentiment_counts.get('negative', 0) or 0)
+    neutral = int(sentiment_counts.get('neutral', 0) or 0)
+
+    if total_items <= 0:
+        return {
+            'summary': 'No recent articles were found, so the meter defaults to Medium risk (50/100).',
+            'components': [
+                'Base risk: 50.0',
+                'Ratio adjustment: +0.0 (no news mix available)',
+                'Confidence adjustment: +0.0',
+            ],
         }
+
+    ratio_sign = '+' if ratio_adjustment >= 0 else ''
+    conf_sign = '+' if confidence_adjustment >= 0 else ''
+    final_sign = '+' if (ratio_adjustment + confidence_adjustment) >= 0 else ''
+    shift = ratio_adjustment + confidence_adjustment
+
+    summary = (
+        f"{risk_level.title()} risk ({risk_score}/100) from {total_items} recent articles: "
+        f"{negative} negative, {neutral} neutral, {positive} positive."
+    )
+    components = [
+        f"Base risk: {base_risk:.1f}",
+        f"Ratio adjustment: {ratio_sign}{ratio_adjustment:.1f} "
+        "(negative coverage increases risk, positive coverage reduces risk)",
+        f"Confidence adjustment: {conf_sign}{confidence_adjustment:.1f} "
+        "(strong negative scores add more than strong positive scores subtract)",
+        f"Net shift from base: {final_sign}{shift:.1f}",
+    ]
+
+    return {
+        'summary': summary,
+        'components': components,
     }
 
 

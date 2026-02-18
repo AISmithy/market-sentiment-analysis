@@ -82,6 +82,7 @@ def analyze(request):
         'risk_score': risk_data['risk_score'],
         'risk_level': risk_data['risk_level'],
         'risk_sentiment_counts': risk_data['sentiment_counts'],
+        'risk_explanation': risk_data.get('risk_explanation'),
         'daily_stats': daily_stats_list,
         'ticker_suggestions': ticker_suggestions,
         'regime': regime_data,
@@ -113,6 +114,7 @@ def price(request):
         'risk_score': risk_data['risk_score'],
         'risk_level': risk_data['risk_level'],
         'risk_sentiment_counts': risk_data['sentiment_counts'],
+        'risk_explanation': risk_data.get('risk_explanation'),
     }
     return JsonResponse(data)
 

@@ -40,6 +40,9 @@
               </div>
             </div>
             <div id="risk-level-badge" style="margin-top:12px; padding:6px 12px; border-radius:20px; font-weight:600; font-size:0.9rem; background:#f59e0b; color:#fff; display:inline-block;">Medium</div>
+            <div id="risk-explanation" style="margin-top:10px; font-size:0.8rem; color:#4b5563; line-height:1.45; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px; width:100%; box-sizing:border-box;">
+              No recent articles were found, so the meter defaults to Medium risk (50/100).
+            </div>
           </div>
         </div>
 
@@ -191,7 +194,7 @@
 
     function formatMarketCap(m){ return m ?? 'N/A'; }
 
-    function updateRiskGauge(riskScore, riskLevel, sentimentCounts) {
+    function updateRiskGauge(riskScore, riskLevel, sentimentCounts, riskExplanation) {
       /* Update the risk gauge display and colors based on score */
       const score = riskScore || 50;
       const level = riskLevel || 'medium';
@@ -226,6 +229,20 @@
         document.getElementById('risk-positive-count').textContent = sentimentCounts.positive || 0;
         document.getElementById('risk-neutral-count').textContent = sentimentCounts.neutral || 0;
         document.getElementById('risk-negative-count').textContent = sentimentCounts.negative || 0;
+      }
+
+      // Update explanation text
+      const explanationEl = document.getElementById('risk-explanation');
+      if (explanationEl) {
+        if (riskExplanation && riskExplanation.summary) {
+          const components = Array.isArray(riskExplanation.components) ? riskExplanation.components : [];
+          const bulletText = components.map(c => `- ${c}`).join('\n');
+          explanationEl.textContent = bulletText ? `${riskExplanation.summary}\n${bulletText}` : riskExplanation.summary;
+          explanationEl.style.whiteSpace = 'pre-line';
+        } else {
+          explanationEl.textContent = 'Risk score is based on recent positive/neutral/negative news balance and model confidence.';
+          explanationEl.style.whiteSpace = 'normal';
+        }
       }
     }
 
@@ -655,7 +672,7 @@
         rawJson.textContent = JSON.stringify(data, null, 2);
 
         // Update risk gauge
-        updateRiskGauge(data.risk_score, data.risk_level, data.risk_sentiment_counts);
+        updateRiskGauge(data.risk_score, data.risk_level, data.risk_sentiment_counts, data.risk_explanation);
 
         // Render heatmap
         const dailyStats = data.daily_stats || [];
@@ -733,7 +750,7 @@
 
         // Update risk gauge with new data
         if(p.risk_score != null){
-          updateRiskGauge(p.risk_score, p.risk_level, p.risk_sentiment_counts);
+          updateRiskGauge(p.risk_score, p.risk_level, p.risk_sentiment_counts, p.risk_explanation);
         }
 
         if(lastUpdatedEl){ lastUpdatedEl.textContent = 'Last updated: ' + new Date().toLocaleString(); }
