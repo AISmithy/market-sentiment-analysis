@@ -1,6 +1,9 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment, compute_regime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def index(request):
@@ -52,9 +55,11 @@ def analyze(request):
 
     # Get ticker suggestions with sentiment
     try:
+        logger.info(f"Fetching ticker suggestions for {ticker}")
         ticker_suggestions = get_ticker_suggestions_with_sentiment(ticker)
+        logger.info(f"Got {len(ticker_suggestions)} ticker suggestions for {ticker}")
     except Exception as e:
-        logger.warning(f"Failed to get ticker suggestions: {e}")
+        logger.exception(f"Failed to get ticker suggestions for {ticker}: {e}")
         ticker_suggestions = []
 
     # Compute market regime

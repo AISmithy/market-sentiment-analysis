@@ -608,13 +608,20 @@ def get_ticker_suggestions_with_sentiment(ticker):
     - sentiment: sentiment summary {positive, negative, neutral, avg_score}
     - count: number of articles analyzed
     """
+    if data_ingestion is None:
+        logger.warning('data_ingestion module not available for ticker suggestions')
+        return []
+    
     related_tickers = get_related_tickers(ticker)
+    logger.info(f"Getting ticker suggestions for {ticker}, found related: {related_tickers}")
     suggestions = []
     
     for suggested_ticker in related_tickers:
         try:
+            logger.info(f"Fetching news for suggested ticker: {suggested_ticker}")
             # Get news and compute sentiment for this ticker
             news = data_ingestion.get_stock_news(suggested_ticker)
+            logger.info(f"Got {len(news) if news else 0} news items for {suggested_ticker}")
             if news:
                 sentiment = compute_sentiment_summary(news)
                 sentiment['count'] = len(news)
@@ -622,11 +629,14 @@ def get_ticker_suggestions_with_sentiment(ticker):
                     'ticker': suggested_ticker,
                     'sentiment': sentiment,
                 })
+            else:
+                logger.warning(f"No news found for {suggested_ticker}")
         except Exception as e:
             # Skip tickers that fail to fetch
-            logger.debug(f"Failed to get news for {suggested_ticker}: {e}")
+            logger.warning(f"Failed to get news for {suggested_ticker}: {e}")
             continue
     
+    logger.info(f"Returning {len(suggestions)} ticker suggestions")
     return suggestions
 
 
