@@ -453,31 +453,55 @@ def compute_daily_sentiment_stats(news_items):
     - net_sentiment: calculated sentiment bias (-1 to 1)
     """
     from datetime import datetime
+    import re
     
     daily_stats = {}
+    skipped = 0
     
     for item in news_items:
         # Parse the published date (format: "Day, dd Mon YYYY hh:mm:ss GMT" or similar)
         published_str = item.get('published') or ''
+        date_obj = None
+        
         try:
             # Try multiple date formats
-            date_obj = None
-            for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S', '%Y-%m-%d']:
+            # Format 1: "Wed, 12 Feb 2026 14:30:00 GMT"
+            for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S']:
                 try:
-                    date_obj = datetime.strptime(published_str.replace('GMT', '').strip(), fmt)
+                    clean_pub = published_str.replace('GMT', '').strip()
+                    date_obj = datetime.strptime(clean_pub, fmt)
                     break
                 except ValueError:
                     continue
             
+            # Format 2: ISO format "2026-02-12" or "2026-02-12T14:30:00"
             if date_obj is None:
-                # If parsing fails, try ISO format or skip
                 try:
-                    date_obj = datetime.fromisoformat(published_str.split('T')[0])
+                    if 'T' in published_str:
+                        date_obj = datetime.fromisoformat(published_str.split('T')[0])
+                    else:
+                        date_obj = datetime.fromisoformat(published_str)
                 except:
-                    continue
+                    pass
+            
+            # Format 3: Try to extract date with regex (dd Mon YYYY)
+            if date_obj is None:
+                match = re.search(r'(\d{1,2})\s+(\w{3})\s+(\d{4})', published_str)
+                if match:
+                    try:
+                        date_obj = datetime.strptime(f"{match.group(1)} {match.group(2)} {match.group(3)}", '%d %b %Y')
+                    except:
+                        pass
+            
+            if date_obj is None:
+                logger.debug(f"Could not parse date: {published_str}")
+                skipped += 1
+                continue
             
             date_key = date_obj.strftime('%Y-%m-%d')
-        except:
+        except Exception as e:
+            logger.debug(f"Error parsing date '{published_str}': {e}")
+            skipped += 1
             continue
         
         if date_key not in daily_stats:
@@ -503,6 +527,11 @@ def compute_daily_sentiment_stats(news_items):
             stats['negative'] += 1
         else:
             stats['neutral'] += 1
+    
+    if skipped > 0:
+        logger.warning(f"Skipped {skipped} news items due to unparseable dates")
+    
+    logger.info(f"Computed daily stats for {len(daily_stats)} unique dates from {len(news_items)} news items")
     
     # Compute derived metrics
     for date_key, stats in daily_stats.items():
