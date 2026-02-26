@@ -600,13 +600,16 @@ def compute_sentiment_summary(news_items):
 
 def get_ticker_suggestions_with_sentiment(ticker):
     """
-    Get related tickers with their current sentiment profiles.
+    Get related tickers with their current sentiment profiles and price data.
     This is cached at the HTTP level to avoid expensive repeated analysis.
     
     Returns a list of dicts with:
     - ticker: the ticker symbol
     - sentiment: sentiment summary {positive, negative, neutral, avg_score}
     - count: number of articles analyzed
+    - price: current price (float or None)
+    - change: price change (float or None)
+    - change_pct: percentage change (float or None)
     """
     if data_ingestion is None:
         logger.warning('data_ingestion module not available for ticker suggestions')
@@ -622,13 +625,35 @@ def get_ticker_suggestions_with_sentiment(ticker):
             # Get news and compute sentiment for this ticker
             news = data_ingestion.get_stock_news(suggested_ticker)
             logger.info(f"Got {len(news) if news else 0} news items for {suggested_ticker}")
+            
+            # Get price data
+            price_data = None
+            try:
+                price_data = data_ingestion.get_price_and_change(suggested_ticker)
+                logger.info(f"Got price data for {suggested_ticker}: {price_data}")
+            except Exception as e:
+                logger.warning(f"Failed to get price for {suggested_ticker}: {e}")
+            
             if news:
                 sentiment = compute_sentiment_summary(news)
                 sentiment['count'] = len(news)
-                suggestions.append({
+                
+                suggestion = {
                     'ticker': suggested_ticker,
                     'sentiment': sentiment,
-                })
+                }
+                
+                # Add price data if available
+                if price_data:
+                    suggestion['price'] = price_data.get('current_price')
+                    suggestion['change'] = price_data.get('change')
+                    suggestion['change_pct'] = price_data.get('change_pct')
+                else:
+                    suggestion['price'] = None
+                    suggestion['change'] = None
+                    suggestion['change_pct'] = None
+                
+                suggestions.append(suggestion)
             else:
                 logger.warning(f"No news found for {suggested_ticker}")
         except Exception as e:

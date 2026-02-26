@@ -464,6 +464,9 @@
       suggestions.forEach(suggestion => {
         const ticker = suggestion.ticker;
         const sent = suggestion.sentiment;
+        const price = suggestion.price;
+        const change = suggestion.change;
+        const changePct = suggestion.change_pct;
         
         // Determine dominant sentiment
         let sentimentColor = '#f59e0b';
@@ -516,6 +519,42 @@
           letter-spacing: 0.5px;
         `;
         tickerEl.textContent = ticker;
+        
+        // Price and change info
+        if (price != null) {
+          const priceEl = document.createElement('div');
+          priceEl.style.cssText = `
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 6px;
+          `;
+          priceEl.textContent = `$${price.toFixed(2)}`;
+          
+          // Add change indicator
+          if (change != null) {
+            const changeEl = document.createElement('span');
+            const isPositive = change > 0;
+            const changeColor = isPositive ? '#10b981' : (change < 0 ? '#ef4444' : '#6b7280');
+            const arrow = isPositive ? '▲' : (change < 0 ? '▼' : '—');
+            changeEl.style.cssText = `
+              font-size: 0.85rem;
+              color: ${changeColor};
+              font-weight: 600;
+              margin-left: 6px;
+            `;
+            changeEl.textContent = `${arrow} ${Math.abs(change).toFixed(2)}`;
+            if (changePct != null) {
+              changeEl.textContent += ` (${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
+            }
+            priceEl.appendChild(changeEl);
+          }
+          
+          card.appendChild(tickerEl);
+          card.appendChild(priceEl);
+        } else {
+          card.appendChild(tickerEl);
+        }
         
         const sentBadge = document.createElement('div');
         sentBadge.style.cssText = `
