@@ -727,6 +727,8 @@
 
         // Render heatmap
         const dailyStats = data.daily_stats || [];
+        console.log('Daily stats received:', dailyStats);
+        console.log('Daily stats count:', dailyStats.length);
         renderHeatmap(dailyStats);
 
         // Render ticker suggestions
