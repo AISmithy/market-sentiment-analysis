@@ -547,14 +547,20 @@
 
     function renderTickerSuggestions(suggestions) {
       /* Render ticker suggestion cards in both locations */
-      const container = document.getElementById('suggestions-container-full');
+      const containerFull = document.getElementById('suggestions-container-full');
+      const containerSidebar = document.getElementById('suggestions-container');
       
       if (!suggestions || suggestions.length === 0) {
-        container.innerHTML = '<div style="color:#999; grid-column:1/-1; text-align:center; padding:20px;">No similar tickers found.</div>';
+        containerFull.innerHTML = '<div style="color:#999; grid-column:1/-1; text-align:center; padding:20px;">No similar tickers found.</div>';
+        containerSidebar.innerHTML = '<div style="color:#999; text-align:center; padding:20px; font-size:0.9rem;">No peers available</div>';
         return;
       }
 
-      container.innerHTML = '';
+      containerFull.innerHTML = '';
+      containerSidebar.innerHTML = '';
+      
+      // Limit sidebar to first 3 suggestions
+      const sidebarSuggestions = suggestions.slice(0, 3);
       
       suggestions.forEach(suggestion => {
         const ticker = suggestion.ticker;
@@ -675,11 +681,102 @@
           <div style="margin-top: 4px; font-size: 0.75rem; color: #999;">${sent.count} articles</div>
         `;
         
-        card.appendChild(tickerEl);
         card.appendChild(sentBadge);
         card.appendChild(statsEl);
         
-        container.appendChild(card);
+        containerFull.appendChild(card);
+      });
+      
+      // Render compact sidebar cards (first 3 only)
+      sidebarSuggestions.forEach(suggestion => {
+        const ticker = suggestion.ticker;
+        const sent = suggestion.sentiment;
+        const price = suggestion.price;
+        const changePct = suggestion.change_pct;
+        
+        // Determine dominant sentiment
+        let sentimentColor = '#f59e0b';
+        let sentimentLabel = 'Neutral';
+        if (sent.positive > sent.negative && sent.positive > sent.neutral) {
+          sentimentColor = '#10b981';
+          sentimentLabel = 'Positive';
+        } else if (sent.negative > sent.positive && sent.negative > sent.neutral) {
+          sentimentColor = '#ef4444';
+          sentimentLabel = 'Negative';
+        }
+        
+        const sidebarCard = document.createElement('div');
+        sidebarCard.style.cssText = `
+          padding: 12px;
+          border-left: 4px solid ${sentimentColor};
+          background: #f9fafb;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        `;
+        
+        sidebarCard.onmouseover = function() {
+          this.style.background = '#f3f4f6';
+          this.style.transform = 'translateX(4px)';
+        };
+        sidebarCard.onmouseout = function() {
+          this.style.background = '#f9fafb';
+          this.style.transform = 'translateX(0)';
+        };
+        
+        sidebarCard.onclick = function() {
+          document.getElementById('ticker').value = ticker;
+          document.getElementById('ticker-form').dispatchEvent(new Event('submit'));
+        };
+        
+        const topRow = document.createElement('div');
+        topRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;';
+        
+        const tickerName = document.createElement('div');
+        tickerName.style.cssText = 'font-size:1.1rem; font-weight:700; color:#1f2937;';
+        tickerName.textContent = ticker;
+        
+        const badge = document.createElement('span');
+        badge.style.cssText = `
+          font-size:0.7rem;
+          padding:3px 8px;
+          border-radius:12px;
+          background:${sentimentColor};
+          color:white;
+          font-weight:600;
+        `;
+        badge.textContent = sentimentLabel;
+        
+        topRow.appendChild(tickerName);
+        topRow.appendChild(badge);
+        
+        sidebarCard.appendChild(topRow);
+        
+        // Price info if available
+        if (price != null) {
+          const priceRow = document.createElement('div');
+          priceRow.style.cssText = 'font-size:0.95rem; color:#1f2937; font-weight:600;';
+          priceRow.textContent = `$${price.toFixed(2)}`;
+          
+          if (changePct != null) {
+            const changeSpan = document.createElement('span');
+            const changeColor = changePct > 0 ? '#10b981' : (changePct < 0 ? '#ef4444' : '#6b7280');
+            changeSpan.style.cssText = `margin-left:8px; font-size:0.85rem; color:${changeColor};`;
+            changeSpan.textContent = `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+            priceRow.appendChild(changeSpan);
+          }
+          
+          sidebarCard.appendChild(priceRow);
+        }
+        
+        // Sentiment counts
+        const countsRow = document.createElement('div');
+        countsRow.style.cssText = 'font-size:0.75rem; color:#6b7280; margin-top:4px;';
+        countsRow.innerHTML = `<span style="color:#10b981;">▲${sent.positive}</span> • <span style="color:#f59e0b;">●${sent.neutral}</span> • <span style="color:#ef4444;">▼${sent.negative}</span>`;
+        
+        sidebarCard.appendChild(countsRow);
+        
+        containerSidebar.appendChild(sidebarCard);
       });
     }
 
