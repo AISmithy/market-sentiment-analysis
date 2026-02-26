@@ -24,7 +24,7 @@
       </section>
 
       <!-- KPI Row: Risk Meter + Sentiment Summary -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+      <div class="kpi-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
         <!-- Risk Gauge Card -->
         <div id="risk-gauge" style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center;">
           <h3 style="margin:0 0 12px 0; font-size:0.95rem; color:#6b7280; text-align:center;">Sentiment-Driven Risk Meter</h3>
@@ -50,7 +50,7 @@
         <div style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <h3 style="margin:0 0 12px 0; font-size:0.95rem; color:#6b7280;">Sentiment Distribution</h3>
           <div id="sentiment-chart" style="height:200px;"></div>
-          <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div class="sentiment-counts" style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
             <div style="text-align:center; padding:8px; background:#f0fdf4; border-radius:6px;">
               <div style="font-size:0.75rem; color:#6b7280; margin-bottom:4px;">Positive</div>
               <div id="risk-positive-count" style="font-size:1.5rem; font-weight:700; color:#10b981;">0</div>
@@ -76,7 +76,7 @@
       </div>
 
       <!-- Heatmap + Suggestions Side by Side -->
-      <div style="display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:20px;">
+      <div class="heatmap-row" style="display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:20px;">
         <!-- Heatmap -->
         <div style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -159,6 +159,101 @@
     .news-tab-btn { transition:all 0.2s; color:#6b7280; }
     .news-tab-btn:hover { color:#1f2937 !important; }
     .news-tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; }
+    
+    /* Mobile-responsive styles */
+    @media (max-width: 768px) {
+      /* Stack grids vertically on mobile */
+      .kpi-row,
+      .heatmap-row {
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      
+      /* Stack company meta info on mobile */
+      .company-meta {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+      }
+      
+      /* Stack sentiment count boxes on mobile */
+      .sentiment-counts {
+        grid-template-columns: 1fr !important;
+      }
+      
+      /* Adjust container padding */
+      body > div {
+        padding: 8px !important;
+      }
+      
+      /* Smaller headers */
+      h1 { font-size: 1.6rem !important; }
+      h2 { font-size: 1.3rem !important; }
+      h3 { font-size: 0.9rem !important; }
+      
+      /* Reduce card padding */
+      #risk-gauge, 
+      #content > section,
+      #content > div > div {
+        padding: 12px !important;
+      }
+      
+      /* Stack sentiment count boxes */
+      #risk-gauge + div > div:last-child {
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      
+      /* Smaller ticker cards */
+      #suggestions-container-full {
+        grid-template-columns: 1fr !important;
+      }
+      
+      /* Hide "Show JSON" button on mobile */
+      #raw-toggle {
+        display: none !important;
+      }
+      
+      /* Adjust news items */
+      .news-item {
+        padding: 10px !important;
+        font-size: 0.9rem !important;
+      }
+      
+      /* Smaller heatmap cells */
+      .heatmap-cell {
+        width: 50px !important;
+        height: 50px !important;
+        font-size: 0.65rem !important;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      /* Extra small screens */
+      h1 { font-size: 1.4rem !important; }
+      
+      /* Full width ticker input */
+      #ticker {
+        width: 100% !important;
+        max-width: 200px !important;
+      }
+      
+      /* Smaller gauge */
+      #risk-gauge svg {
+        width: 100px !important;
+        height: 100px !important;
+      }
+      
+      #risk-score-display {
+        font-size: 24px !important;
+      }
+      
+      /* Even smaller heatmap cells */
+      .heatmap-cell {
+        width: 42px !important;
+        height: 42px !important;
+        font-size: 0.6rem !important;
+      }
+    }
   </style>
 
   <script>
@@ -640,6 +735,7 @@
         
         const meta = document.createElement('div');
         meta.style.cssText = 'display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.2);';
+        meta.className = 'company-meta';
         
         // Price card
         let priceHtml = 'N/A';
