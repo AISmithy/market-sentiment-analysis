@@ -75,8 +75,8 @@
         </div>
       </div>
 
-      <!-- Heatmap + Suggestions Side by Side -->
-      <div class="heatmap-row" style="display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:20px;">
+      <!-- Heatmap Full Width -->
+      <div class="heatmap-row" style="margin-bottom:20px;">
         <!-- Heatmap -->
         <div style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -98,12 +98,6 @@
               <span>Negative</span>
             </div>
           </div>
-        </div>
-
-        <!-- Similar Tickers -->
-        <div style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-          <h3 style="margin:0 0 12px 0; font-size:1rem;">Sector Peers</h3>
-          <div id="suggestions-container" style="display:flex; flex-direction:column; gap:10px;"></div>
         </div>
       </div>
 
@@ -163,8 +157,7 @@
     /* Mobile-responsive styles */
     @media (max-width: 768px) {
       /* Stack grids vertically on mobile */
-      .kpi-row,
-      .heatmap-row {
+      .kpi-row {
         display: flex !important;
         flex-direction: column !important;
       }
@@ -546,21 +539,15 @@
     }
 
     function renderTickerSuggestions(suggestions) {
-      /* Render ticker suggestion cards in both locations */
+      /* Render ticker suggestion cards in full-width section */
       const containerFull = document.getElementById('suggestions-container-full');
-      const containerSidebar = document.getElementById('suggestions-container');
       
       if (!suggestions || suggestions.length === 0) {
         containerFull.innerHTML = '<div style="color:#999; grid-column:1/-1; text-align:center; padding:20px;">No similar tickers found.</div>';
-        containerSidebar.innerHTML = '<div style="color:#999; text-align:center; padding:20px; font-size:0.9rem;">No peers available</div>';
         return;
       }
 
       containerFull.innerHTML = '';
-      containerSidebar.innerHTML = '';
-      
-      // Limit sidebar to first 3 suggestions
-      const sidebarSuggestions = suggestions.slice(0, 3);
       
       suggestions.forEach(suggestion => {
         const ticker = suggestion.ticker;
@@ -685,98 +672,6 @@
         card.appendChild(statsEl);
         
         containerFull.appendChild(card);
-      });
-      
-      // Render compact sidebar cards (first 3 only)
-      sidebarSuggestions.forEach(suggestion => {
-        const ticker = suggestion.ticker;
-        const sent = suggestion.sentiment;
-        const price = suggestion.price;
-        const changePct = suggestion.change_pct;
-        
-        // Determine dominant sentiment
-        let sentimentColor = '#f59e0b';
-        let sentimentLabel = 'Neutral';
-        if (sent.positive > sent.negative && sent.positive > sent.neutral) {
-          sentimentColor = '#10b981';
-          sentimentLabel = 'Positive';
-        } else if (sent.negative > sent.positive && sent.negative > sent.neutral) {
-          sentimentColor = '#ef4444';
-          sentimentLabel = 'Negative';
-        }
-        
-        const sidebarCard = document.createElement('div');
-        sidebarCard.style.cssText = `
-          padding: 12px;
-          border-left: 4px solid ${sentimentColor};
-          background: #f9fafb;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        `;
-        
-        sidebarCard.onmouseover = function() {
-          this.style.background = '#f3f4f6';
-          this.style.transform = 'translateX(4px)';
-        };
-        sidebarCard.onmouseout = function() {
-          this.style.background = '#f9fafb';
-          this.style.transform = 'translateX(0)';
-        };
-        
-        sidebarCard.onclick = function() {
-          document.getElementById('ticker').value = ticker;
-          document.getElementById('ticker-form').dispatchEvent(new Event('submit'));
-        };
-        
-        const topRow = document.createElement('div');
-        topRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;';
-        
-        const tickerName = document.createElement('div');
-        tickerName.style.cssText = 'font-size:1.1rem; font-weight:700; color:#1f2937;';
-        tickerName.textContent = ticker;
-        
-        const badge = document.createElement('span');
-        badge.style.cssText = `
-          font-size:0.7rem;
-          padding:3px 8px;
-          border-radius:12px;
-          background:${sentimentColor};
-          color:white;
-          font-weight:600;
-        `;
-        badge.textContent = sentimentLabel;
-        
-        topRow.appendChild(tickerName);
-        topRow.appendChild(badge);
-        
-        sidebarCard.appendChild(topRow);
-        
-        // Price info if available
-        if (price != null) {
-          const priceRow = document.createElement('div');
-          priceRow.style.cssText = 'font-size:0.95rem; color:#1f2937; font-weight:600;';
-          priceRow.textContent = `$${price.toFixed(2)}`;
-          
-          if (changePct != null) {
-            const changeSpan = document.createElement('span');
-            const changeColor = changePct > 0 ? '#10b981' : (changePct < 0 ? '#ef4444' : '#6b7280');
-            changeSpan.style.cssText = `margin-left:8px; font-size:0.85rem; color:${changeColor};`;
-            changeSpan.textContent = `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`;
-            priceRow.appendChild(changeSpan);
-          }
-          
-          sidebarCard.appendChild(priceRow);
-        }
-        
-        // Sentiment counts
-        const countsRow = document.createElement('div');
-        countsRow.style.cssText = 'font-size:0.75rem; color:#6b7280; margin-top:4px;';
-        countsRow.innerHTML = `<span style="color:#10b981;">▲${sent.positive}</span> • <span style="color:#f59e0b;">●${sent.neutral}</span> • <span style="color:#ef4444;">▼${sent.negative}</span>`;
-        
-        sidebarCard.appendChild(countsRow);
-        
-        containerSidebar.appendChild(sidebarCard);
       });
     }
 
