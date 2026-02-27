@@ -11,13 +11,14 @@ The primary goal of this project is to provide a lightweight, reproducible pipel
 - Fetch historical price data and current price for a given stock ticker.
 - Collect recent news items about the company and score each item for sentiment (Positive/Negative/Neutral) using a FinBERT model from Hugging Face.
 - **Compute sentiment-driven risk scores (0-100)** based on recent news sentiment distribution.
-- **Generate daily sentiment heatmap** with clickable date filtering for temporal analysis.
+- **Surface top sentiment drivers** (keyword trends for today and last 7 days).
 - **Recommend similar tickers** from the same sector with comparative sentiment analysis.
 - Present the results in an interactive, modern web-friendly view with:
   - Candlestick chart for historical price trends
   - Circular SVG risk gauge with color-coded severity levels (low/medium/high)
-  - Daily sentiment heatmap with sentiment-based color coding
-  - Tabbed news interface (Recent/Filtered by Date)
+  - Sentiment distribution chart and live risk sentiment counters
+  - Top sentiment drivers widgets (today vs last 7 days)
+  - Streamlined recent news feed
   - Sector peer recommendations with sentiment indicators
   - Company profile, sentiment badges, confidence percentages, and raw JSON for debugging
 - Support both a full analysis endpoint (news + model inference + charts) and a lightweight price-only endpoint for efficient real-time polling (30s intervals).
@@ -31,11 +32,11 @@ This repository is intended for experimentation and prototyping; it's not harden
 - ✅ Retrieve recent news items for a ticker and analyze sentiment using FinBERT (`ProsusAI/finbert`) via `transformers`.
 - ✅ **Sentiment-driven risk scoring** — generates 0-100 risk score based on negative/positive/neutral news ratios.
 - ✅ **Daily sentiment aggregation** — groups news by date and computes daily sentiment statistics.
+- ✅ **Top sentiment drivers** — extracts frequent sentiment-driving keywords for today and the last 7 days.
 - ✅ **Sector peer discovery** — recommends 3-5 related tickers from 8 industry categories (mega tech, AI/ML, cloud, semiconductors, finance, consumer, energy, pharma).
-- ✅ **Interactive heatmap** — clickable daily sentiment timeline with color-coded sentiment levels.
 - ✅ **Live polling** — automatic price/risk updates every 30 seconds.
 - ✅ **Modern responsive UI** — CSS Grid layout, card-based design, hover effects, sentiment badges, confidence percentages.
-- ✅ **News filtering** — toggle between all news and date-filtered views via tabbed interface.
+- ✅ **Modular frontend architecture** — Django template partials plus externalized CSS/JS static assets.
 
 ## Repository layout
 
@@ -43,12 +44,16 @@ This repository is intended for experimentation and prototyping; it's not harden
 	- `data_ingestion.py` — helpers for fetching stock data, company info and news.
 	- `sentiment_analyzer.py` — loads the Hugging Face FinBERT pipeline and maps model outputs.
 	- `utils.py` — small utilities (logging, helpers).
+  - `widgets/` — Streamlit widget modules (`sidebar_widget.py`, `price_chart_widget.py`, `company_profile_widget.py`, `news_sentiment_widget.py`).
 - `script/` — standalone utility scripts for model evaluation and dataset creation:
 	- `baseline_finbert_eval.py` — evaluate FinBERT on labeled headline datasets; outputs metrics, confusion matrix, and optional APA-formatted .docx report.
 	- `build_silver_dataset.py` — fetch news for a ticker and label each headline with FinBERT sentiment; saves CSV for training/evaluation.
 - `market_site/` — Django project scaffolding (development server and settings).
 - `sentiment/` — Django app that exposes the web UI and JSON endpoints (`/analyze/`, `/price/`).
+- `sentiment/static/sentiment/` — frontend static assets (`css/index.css`, `js/index.js`).
 - `templates/sentiment/` — Django HTML templates for the web UI.
+  - `index.html` — page shell + partial includes.
+  - `partials/` — widget-like partial templates (`company_card`, `kpi_row`, `risk_meter`, `sentiment_distribution`, `charts_row`, `top_drivers`, `news_list`, `similar_tickers`, `raw_json`).
 - `config/settings.py` — basic configuration (model name, etc.).
 - `requirements.txt` — Python dependencies.
 - `.gitignore` — excludes cache, reports, build artifacts, and virtual environments from git tracking.
@@ -107,6 +112,7 @@ Runs full analysis for the given ticker and returns comprehensive JSON data. Use
 - `risk_level` — 'low' (0-32), 'medium' (33-66), or 'high' (67-100)
 - `risk_sentiment_counts` — breakdown of positive/negative/neutral articles
 - `daily_stats` — array of daily sentiment statistics (by date: count, positive, negative, neutral, avg_score, dominant_sentiment, net_sentiment)
+- `top_keywords` — grouped sentiment drivers (`today`, `week`) with `{keyword, count}` items
 - `ticker_suggestions` — array of related tickers with their sentiment profiles (for peer comparison)
 - `history` — historical candlestick data (OHLCV format)
 
@@ -146,18 +152,18 @@ The modern dashboard (`http://127.0.0.1:8000/`) provides:
 - **Company Card** — gradient header with ticker, company name, current price (color-coded delta), sector, market cap, business summary
 - **KPI Row** — side-by-side risk gauge (SVG circular meter) and sentiment distribution pie chart
 - **Candlestick Chart** — Plotly interactive historical price chart (OHLCV)
-- **Heatmap + Peers** — two-column layout with daily sentiment timeline (clickable cells) and sector peer cards
-- **News Section** — tabbed interface (Recent/Filtered by Date) with scrollable list of news cards
+- **Top Drivers** — today vs last-7-days keyword chips with show more/less toggle
+- **News Section** — streamlined recent news list with sentiment badges and confidence
 - **Ticker Suggestions** — grid of related tickers with sentiment-based border colors and stat breakdown
 - **Raw JSON** — toggle-able debug view of API response
 
 ### Interactive Elements
 
 - **Risk Gauge** — circular SVG arc that visualizes risk (green=low, orange=medium, red=high), updates on polling
-- **Heatmap Cells** — click to filter news by date; hover for tooltip with sentiment breakdown
+- **Top Drivers Chips** — frequent headline keywords for quick sentiment context
 - **News Cards** — hover effects, sentiment badge (green/yellow/red), confidence percentage, publication date
 - **Ticker Cards** — click to navigate to related ticker; color-coded border by dominant sentiment
-- **Tab Switching** — toggle between all news and date-filtered news without page reload
+- **Show JSON Toggle** — inspect API payload inline for debugging
 - **Live Polling** — price and risk gauge update automatically every 30 seconds
 
 Notes:
@@ -216,16 +222,14 @@ Django view handlers that orchestrate services and format responses:
 - `analyze(request)` — `/analyze/` endpoint that calls all service functions and returns full JSON response
 - `price(request)` — `/price/` endpoint that returns lightweight price + risk data for polling
 
-### Frontend (`templates/sentiment/index.html`)
+### Frontend (Django templates + static assets)
 
-Interactive dashboard built with vanilla JavaScript, CSS Grid, SVG, and Plotly:
+Interactive dashboard built with template partials, vanilla JavaScript, CSS Grid, SVG, and Plotly:
 
-- `updateRiskGauge(riskScore, riskLevel, sentimentCounts)` — updates SVG circular gauge with color-coded arc
-- `renderHeatmap(dailyStats)` — creates clickable date cells with sentiment coloring
-- `filterNewsByDate(date, cellEl)` — toggles date filter and updates news display
-- `displayNewsList(newsArray)` — renders news items as styled cards with sentiment badges
-- `renderTickerSuggestions(suggestions)` — creates grid of peer ticker cards with sentiment indicators
-- `pollPrice()` — 30-second polling for live price/risk updates
+- `templates/sentiment/index.html` — page shell that includes partial widgets and loads static assets
+- `templates/sentiment/partials/*.html` — widget-like view components (company card, KPI row, charts, drivers, news, suggestions, raw JSON)
+- `sentiment/static/sentiment/css/index.css` — responsive styling and UI utility classes
+- `sentiment/static/sentiment/js/index.js` — client behavior including `updateRiskGauge`, `renderTopDrivers`, `displayNewsList`, `renderTickerSuggestions`, and `pollPrice`
 
 - Git and artifacts:
 	- The `.gitignore` file excludes cache/, reports/, runs/, __pycache__/, .venv/, and other temporary artifacts.
