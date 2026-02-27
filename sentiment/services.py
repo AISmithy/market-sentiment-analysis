@@ -556,6 +556,101 @@ def compute_daily_sentiment_stats(news_items):
     
     return daily_stats
 
+
+def compute_top_keywords(news_items, top_n=15):
+    """
+    Extract most common keywords/entities from headlines for today and last 7 days.
+
+    Returns a dict with:
+    - today: list of {keyword, count}
+    - week: list of {keyword, count}
+    """
+    from datetime import datetime, timedelta
+    import re
+
+    if not news_items:
+        return {'today': [], 'week': []}
+
+    now = datetime.utcnow().date()
+    week_start = now - timedelta(days=6)
+
+    stopwords = {
+        'the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'over', 'after',
+        'before', 'about', 'between', 'among', 'during', 'while', 'where', 'which',
+        'when', 'what', 'who', 'why', 'how', 'will', 'said', 'says', 'report', 'reports',
+        'reported', 'update', 'updates', 'today', 'market', 'markets', 'stock', 'stocks',
+        'share', 'shares', 'company', 'companies', 'quarter', 'results', 'earnings',
+        'profit', 'loss', 'revenue', 'growth', 'forecast', 'guidance', 'price', 'prices',
+        'surge', 'drops', 'rise', 'falls', 'cut', 'cuts', 'deal', 'new', 'year', 'years',
+        'week', 'weeks', 'month', 'months', 'announces', 'announced', 'launch', 'launches',
+    }
+
+    def parse_published_date(published_str):
+        if not published_str:
+            return None
+
+        cleaned = published_str.replace('GMT', '').strip()
+        for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S']:
+            try:
+                return datetime.strptime(cleaned, fmt).date()
+            except ValueError:
+                continue
+
+        try:
+            if 'T' in published_str:
+                return datetime.fromisoformat(published_str.split('T')[0]).date()
+            return datetime.fromisoformat(published_str).date()
+        except Exception:
+            pass
+
+        match = re.search(r'(\d{1,2})\s+(\w{3})\s+(\d{4})', published_str)
+        if match:
+            try:
+                return datetime.strptime(
+                    f"{match.group(1)} {match.group(2)} {match.group(3)}",
+                    '%d %b %Y',
+                ).date()
+            except Exception:
+                pass
+
+        return None
+
+    def normalize_token(token):
+        t = token.lower()
+        if len(t) < 3 or t in stopwords:
+            return None
+        return t
+
+    def count_keywords(items):
+        counts = {}
+        for item in items:
+            title = item.get('title') or ''
+            for token in re.findall(r'[A-Za-z]{2,}', title):
+                normalized = normalize_token(token)
+                if not normalized:
+                    continue
+                counts[normalized] = counts.get(normalized, 0) + 1
+
+        ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        return [{'keyword': k, 'count': v} for k, v in ranked[:top_n]]
+
+    today_items = []
+    week_items = []
+    for item in news_items:
+        published_date = parse_published_date(item.get('published') or '')
+        if not published_date:
+            continue
+
+        if published_date == now:
+            today_items.append(item)
+        if week_start <= published_date <= now:
+            week_items.append(item)
+
+    return {
+        'today': count_keywords(today_items),
+        'week': count_keywords(week_items),
+    }
+
 def get_related_tickers(ticker):
     """
     Get a list of related tickers based on industry/sector grouping.

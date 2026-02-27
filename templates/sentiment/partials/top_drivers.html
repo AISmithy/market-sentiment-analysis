@@ -1,0 +1,29 @@
+<!-- Top Sentiment Drivers -->
+<div style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); margin-bottom:20px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:10px;">
+    <div>
+      <h3 style="margin:0;">Top Sentiment Drivers</h3>
+      <div style="font-size:0.8rem; color:#6b7280; margin-top:4px;">Most frequent headline keywords shaping sentiment</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button id="drivers-toggle" type="button" style="padding:4px 10px; border:1px solid #d1d5db; border-radius:999px; background:#ffffff; font-size:0.75rem; color:#1f2937; cursor:pointer;">Show more</button>
+      <div style="font-size:0.75rem; color:#9ca3af;">Auto-updated</div>
+    </div>
+  </div>
+  <div id="top-drivers" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+    <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="font-size:0.8rem; color:#6b7280; font-weight:600;">Today</div>
+        <span style="font-size:0.7rem; color:#9ca3af;">Top 5</span>
+      </div>
+      <div id="drivers-today" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+    <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="font-size:0.8rem; color:#6b7280; font-weight:600;">Last 7 days</div>
+        <span style="font-size:0.7rem; color:#9ca3af;">Top 5</span>
+      </div>
+      <div id="drivers-week" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+  </div>
+</div>

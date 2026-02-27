@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment, compute_regime
+from .services import get_company_data, analyze_news_for_ticker, compute_risk_score, compute_daily_sentiment_stats, get_ticker_suggestions_with_sentiment, compute_regime, compute_top_keywords
 import logging
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,9 @@ def analyze(request):
     # Convert to sorted list by date (newest first)
     daily_stats_list = sorted(daily_stats.values(), key=lambda x: x['date'], reverse=True)
 
+    # Compute top sentiment drivers (today / last 7 days)
+    top_keywords = compute_top_keywords(news)
+
     # Get ticker suggestions with sentiment
     try:
         logger.info(f"Fetching ticker suggestions for {ticker}")
@@ -88,6 +91,7 @@ def analyze(request):
         'risk_explanation': risk_data.get('risk_explanation'),
         'risk_method': risk_data.get('risk_method'),
         'daily_stats': daily_stats_list,
+        'top_keywords': top_keywords,
         'ticker_suggestions': ticker_suggestions,
         'regime': regime_data,
     }

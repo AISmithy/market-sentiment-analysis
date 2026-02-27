@@ -1,17 +1,24 @@
+import os
 import yfinance as yf
 from yahoo_fin import news as yf_news
 
 # Try to import Streamlit caching wrappers when available. If not, provide no-op decorators.
-try:
-    import streamlit as st
-    cache_data = st.cache_data
-except Exception:
-    def cache_data(ttl=None):
-        def _decorator(fn):
-            return fn
-        return _decorator
+def _noop_cache_data(ttl=None):
+    def _decorator(fn):
+        return fn
+    return _decorator
 
-from .sentiment_analyzer import load_sentiment_model, analyze_sentiment
+
+if os.environ.get("DJANGO_SETTINGS_MODULE"):
+    cache_data = _noop_cache_data
+else:
+    try:
+        import streamlit as st
+        cache_data = st.cache_data
+    except Exception:
+        cache_data = _noop_cache_data
+
+from src.sentiment_analyzer import load_sentiment_model, analyze_sentiment
 
 
 @cache_data(ttl=3600)

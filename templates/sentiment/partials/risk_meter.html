@@ -1,0 +1,20 @@
+<!-- Risk Gauge Card -->
+<div id="risk-gauge" style="background:#ffffff; padding:16px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center;">
+  <h3 style="margin:0 0 12px 0; font-size:0.95rem; color:#6b7280; text-align:center;">Sentiment-Driven Risk Meter</h3>
+  <div style="width:100%; text-align:center;">
+    <div style="width:120px; height:120px; margin:0 auto; position:relative;">
+      <svg width="120" height="120" style="transform:rotate(-90deg);">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#eee" stroke-width="8"/>
+        <circle id="risk-arc" cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="8" stroke-dasharray="0 314" stroke-linecap="round"/>
+      </svg>
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+        <div id="risk-score-display" style="font-size:32px; font-weight:700; color:#1f2937;">50</div>
+        <div style="font-size:12px; color:#6b7280;">risk</div>
+      </div>
+    </div>
+    <div id="risk-level-badge" style="margin-top:12px; padding:6px 12px; border-radius:20px; font-weight:600; font-size:0.9rem; background:#f59e0b; color:#fff; display:inline-block;">Medium</div>
+    <div id="risk-explanation" style="margin-top:10px; font-size:0.8rem; color:#4b5563; line-height:1.45; text-align:left; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px; width:100%; box-sizing:border-box;">
+      No recent articles were found, so the meter defaults to Medium risk (50/100).
+    </div>
+  </div>
+</div>
