@@ -3,7 +3,6 @@
 pandas
 yfinance
 yahoo_fin
-streamlit
 plotly
 transformers
 torch

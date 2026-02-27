@@ -1,22 +1,14 @@
-import os
 import yfinance as yf
 from yahoo_fin import news as yf_news
 
-# Try to import Streamlit caching wrappers when available. If not, provide no-op decorators.
+# Cache decorator placeholder for compatibility.
 def _noop_cache_data(ttl=None):
     def _decorator(fn):
         return fn
     return _decorator
 
 
-if os.environ.get("DJANGO_SETTINGS_MODULE"):
-    cache_data = _noop_cache_data
-else:
-    try:
-        import streamlit as st
-        cache_data = st.cache_data
-    except Exception:
-        cache_data = _noop_cache_data
+cache_data = _noop_cache_data
 
 from src.sentiment_analyzer import load_sentiment_model, analyze_sentiment
 
@@ -123,12 +115,7 @@ def get_stock_news(ticker):
     """ Fetches and analyzes the latest news articles. """
     classifier = load_sentiment_model()
     if classifier is None:
-        # If running without Streamlit, just return an empty list
-        try:
-            import streamlit as st
-            st.error("Sentiment model failed to load. News analysis disabled.")
-        except Exception:
-            pass
+        print("Sentiment model failed to load. News analysis disabled.")
         return []
 
     try:

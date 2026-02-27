@@ -22,7 +22,7 @@ The primary goal of this project is to provide a lightweight, reproducible pipel
   - Sector peer recommendations with sentiment indicators
   - Company profile, sentiment badges, confidence percentages, and raw JSON for debugging
 - Support both a full analysis endpoint (news + model inference + charts) and a lightweight price-only endpoint for efficient real-time polling (30s intervals).
-- Keep the core ingestion and analysis logic reusable so the same functions can power different UIs.
+- Keep the core ingestion and analysis logic reusable within the Django app.
 
 This repository is intended for experimentation and prototyping; it's not hardened for production use (no auth, limited rate-limiting, model loading occurs on first request). See "Development notes" and "Troubleshooting" for operational guidance.
 
@@ -40,11 +40,10 @@ This repository is intended for experimentation and prototyping; it's not harden
 
 ## Repository layout
 
-- `src/` — core ingestion and analysis logic (re-usable between UIs):
+- `src/` — core ingestion and analysis logic used by Django services:
 	- `data_ingestion.py` — helpers for fetching stock data, company info and news.
 	- `sentiment_analyzer.py` — loads the Hugging Face FinBERT pipeline and maps model outputs.
 	- `utils.py` — small utilities (logging, helpers).
-  - `widgets/` — Streamlit widget modules (`sidebar_widget.py`, `price_chart_widget.py`, `company_profile_widget.py`, `news_sentiment_widget.py`).
 - `script/` — standalone utility scripts for model evaluation and dataset creation:
 	- `baseline_finbert_eval.py` — evaluate FinBERT on labeled headline datasets; outputs metrics, confusion matrix, and optional APA-formatted .docx report.
 	- `build_silver_dataset.py` — fetch news for a ticker and label each headline with FinBERT sentiment; saves CSV for training/evaluation.
@@ -57,6 +56,11 @@ This repository is intended for experimentation and prototyping; it's not harden
 - `config/settings.py` — basic configuration (model name, etc.).
 - `requirements.txt` — Python dependencies.
 - `.gitignore` — excludes cache, reports, build artifacts, and virtual environments from git tracking.
+
+## UI Scope
+
+- Primary and only user interface: Django (`http://127.0.0.1:8000/`).
+- Streamlit UI has been removed to avoid duplicate app paths and user confusion.
 
 ## Requirements
 
