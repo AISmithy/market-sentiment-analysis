@@ -62,6 +62,57 @@ This repository is intended for experimentation and prototyping; it's not harden
 - Primary and only user interface: Django (`http://127.0.0.1:8000/`).
 - Streamlit UI has been removed to avoid duplicate app paths and user confusion.
 
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Backend Web | Django 6 | Routing, views, templates, JSON endpoints |
+| Frontend | HTML partials, CSS, Vanilla JavaScript | Dashboard rendering and client interactions |
+| Charts | Plotly.js | Candlestick and sentiment visualizations |
+| NLP Model | Hugging Face Transformers (`ProsusAI/finbert`) | Financial sentiment inference |
+| ML Runtime | PyTorch, Accelerate | Model execution and inference backend |
+| Market Data | `yfinance` | Historical prices and company profile |
+| News Feed | `yahoo_fin` | Latest ticker-related headlines |
+| Data Processing | Pandas | Aggregations and feature calculations |
+| Database | SQLite (Django default) | Local development persistence |
+| Language/Runtime | Python 3.12 (venv) | Application runtime |
+
+## Technical Architecture
+
+```mermaid
+flowchart TD
+    U[Browser UI\nDjango Template + Static JS/CSS] -->|HTTP GET /| DJ[Django App]
+
+    subgraph Django
+      DJ --> VIEWS[sentiment/views.py]
+      VIEWS -->|/analyze| SRV[sentiment/services.py]
+      VIEWS -->|/price| SRV
+      VIEWS --> TPL[templates/sentiment/*.html]
+      TPL --> STA[sentiment/static/sentiment/*]
+    end
+
+    subgraph Core Analytics
+      SRV --> ING[src/data_ingestion.py]
+      SRV --> RISK[Risk + Regime + Suggestions\ncomputation]
+      ING --> SA[src/sentiment_analyzer.py]
+    end
+
+    ING --> YF[yfinance API]
+    ING --> YN[yahoo_fin news RSS]
+    SA --> HF[Hugging Face FinBERT]
+    HF --> PT[PyTorch Runtime]
+
+    SRV --> RESP[JSON Response\ncompany/news/risk/top_keywords/history]
+    RESP --> U
+```
+
+### Runtime flow
+
+1. User opens `/` and Django renders the dashboard shell.
+2. Frontend calls `/analyze/?ticker=...` for full data and sentiment analytics.
+3. Services orchestrate ingestion + model inference + risk/summary computations.
+4. Frontend polls `/price/?ticker=...` every 30s for lightweight live updates.
+
 ## Requirements
 
 - Python 3.8+ (3.10/3.11 recommended)
